@@ -315,6 +315,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
   .toggle-row { padding: 8px 0; }
   .settings-save-bar { flex-direction: column; }
   .settings-save-bar .btn-primary { width: 100%; text-align: center; }
+  #welcome-overlay .modal { border-radius: 16px; max-height: 95vh; }
+  #welcome-overlay [style*='grid-template-columns:1fr 1fr'] { grid-template-columns: 1fr !important; }
 }
 
 /* Slightly wider phones (401-700px) — 2-col settings still works */
@@ -364,9 +366,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
     </div>
   </div>
   <div class="tab-bar">
-    <button class="tab-btn active" onclick="switchTab('invoice',this)">📄 Invoice</button>
-    <button class="tab-btn" onclick="switchTab('log',this)">📋 Log</button>
-    <button class="tab-btn" onclick="switchTab('settings',this)">⚙️ Settings</button>
+    <button class="tab-btn active" data-tab="invoice">📄 Invoice</button>
+    <button class="tab-btn" data-tab="log">📋 Log</button>
+    <button class="tab-btn" data-tab="settings">⚙️ Settings</button>
   </div>
 </header>
 
@@ -637,13 +639,16 @@ function buildMinOpts(sel){
 }
 
 // ── TABS ─────────────────────────────────────────────────────────
-window.switchTab = function(name, btn){
+function switchTab(name){
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
-  btn.classList.add('active');
+  document.querySelector(`[data-tab="${name}"]`).classList.add('active');
   if(name==='log'){ loadLogFromDB().then(()=>renderLog()); }
-};
+}
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', function(){ switchTab(this.dataset.tab); });
+});
 
 // ── SETTINGS ─────────────────────────────────────────────────────
 let _settingsCache = {};
@@ -1455,6 +1460,7 @@ document.getElementById('inv-date').value=today();
   populateSettingsForm();
   updateNumDisplay();
   await restoreDraft();
+  await checkFirstRun();
   showToast('Ready ✓','success');
   setTimeout(()=>showToast('','clear'),2000);
 })();
@@ -1784,6 +1790,72 @@ document.getElementById('edit-modal-overlay').addEventListener('click', function
   if (e.target === this) this.classList.remove('open');
 });
 
+
+// ── WELCOME MODAL ────────────────────────────────────────────────
+async function checkFirstRun(){
+  // Only show if no settings saved yet
+  const existing = await sbGet('pd_invoices_settings', 'key=eq.name');
+  if(existing.length) return; // Already set up
+  document.getElementById('welcome-overlay').style.display = 'flex';
+}
+
+async function saveWelcomeSettings(){
+  const s = {
+    name:    document.getElementById('w-name').value.trim() || 'Peter Devane',
+    address: document.getElementById('w-address').value.trim(),
+    rate:    document.getElementById('w-rate').value || '250',
+    dayHours:document.getElementById('w-hours').value || '8',
+    bankName:document.getElementById('w-bank-name').value.trim(),
+    bankBank:document.getElementById('w-bank-bank').value.trim(),
+    bankSort:document.getElementById('w-bank-sort').value.trim(),
+    bankAcc: document.getElementById('w-bank-acc').value.trim(),
+    vatReg:  false,
+    vatNum:  '',
+  };
+  showToast('Saving your details…','info');
+  try{
+    for(const [key,val] of Object.entries(s)){
+      const existing = await sbGet('pd_invoices_settings', `key=eq.${key}`);
+      if(existing.length){
+        await sbPatch('pd_invoices_settings', existing[0].id, {value: JSON.stringify(val), updated_at: new Date().toISOString()});
+      } else {
+        await sbPost('pd_invoices_settings', {key, value: JSON.stringify(val)});
+      }
+    }
+    _settingsCache = s;
+    // Apply rate to invoice form
+    document.getElementById('day-rate').value = s.rate;
+    document.getElementById('day-hours').value = s.dayHours || '8';
+    // Populate settings tab too
+    populateSettingsForm();
+    showToast('All set — welcome! ✓','success');
+  }catch(e){
+    showToast('Saved locally — check connection','info');
+    _settingsCache = s;
+  }
+  document.getElementById('welcome-overlay').style.display = 'none';
+}
+
+document.getElementById('welcome-save-btn').addEventListener('click', saveWelcomeSettings);
+document.getElementById('welcome-skip-btn').addEventListener('click', ()=>{
+  document.getElementById('welcome-overlay').style.display = 'none';
+});
+
+// ── STD HOURS DROPDOWNS FIX ──────────────────────────────────────
+// Rebuild selects after DOM is fully ready
+(function rebuildStdHours(){
+  const sh = document.getElementById('std-start-h');
+  const fh = document.getElementById('std-finish-h');
+  if(!sh || !fh) return;
+  sh.innerHTML = ''; fh.innerHTML = '';
+  for(let h=6;h<=22;h++){
+    const v = String(h).padStart(2,'0');
+    const os = document.createElement('option'); os.value=v; os.textContent=v; if(h===9) os.selected=true; sh.appendChild(os);
+    const of = document.createElement('option'); of.value=v; of.textContent=v; if(h===17) of.selected=true; fh.appendChild(of);
+  }
+  updateStdPreview();
+})();
+
 </script>
 
 <!-- ── LOG VIEW MODAL ── -->
@@ -1857,5 +1929,73 @@ document.getElementById('edit-modal-overlay').addEventListener('click', function
   </div>
 </div>
 
+
+<!-- ── WELCOME MODAL ── -->
+<div class="modal-overlay" id="welcome-overlay" style="display:none;z-index:2000;">
+  <div class="modal" style="max-width:560px;">
+    <div style="padding:32px 32px 0;">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+        <div style="background:linear-gradient(135deg,var(--navy),var(--navy-light));border-radius:12px;padding:12px;flex-shrink:0;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>
+        </div>
+        <div>
+          <h2 style="font-size:1.25rem;font-weight:700;color:var(--navy);">Welcome to PD Invoice Generator</h2>
+          <p style="font-size:.82rem;color:var(--slate);margin-top:3px;">Let's set up your details before you start.</p>
+        </div>
+      </div>
+
+      <div style="background:var(--bg);border-radius:10px;padding:18px;margin-bottom:18px;border:1px solid var(--border);">
+        <p style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--slate);margin-bottom:14px;padding-left:8px;border-left:3px solid var(--amber);padding-left:10px;">Your Details</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="meta-field" style="grid-column:1/-1;">
+            <label>Your Name</label>
+            <input type="text" id="w-name" placeholder="Peter Devane" value="Peter Devane">
+          </div>
+          <div class="meta-field" style="grid-column:1/-1;">
+            <label>Your Address</label>
+            <textarea id="w-address" style="min-height:72px;">43 Audley Street
+Ashton-under-Lyne
+Lancashire
+OL6 6RB</textarea>
+          </div>
+          <div class="meta-field">
+            <label>Default Day Rate (£)</label>
+            <input type="number" id="w-rate" placeholder="250" value="250">
+          </div>
+          <div class="meta-field">
+            <label>Working Day (hrs)</label>
+            <input type="number" id="w-hours" placeholder="8" value="8">
+          </div>
+        </div>
+      </div>
+
+      <div style="background:var(--bg);border-radius:10px;padding:18px;margin-bottom:24px;border:1px solid var(--border);">
+        <p style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--slate);margin-bottom:14px;padding-left:10px;border-left:3px solid var(--amber);">Bank Details <span style="font-weight:400;font-size:.7rem;text-transform:none;letter-spacing:0;">(shown on invoice)</span></p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="meta-field">
+            <label>Account Name</label>
+            <input type="text" id="w-bank-name" placeholder="Peter Devane">
+          </div>
+          <div class="meta-field">
+            <label>Bank Name</label>
+            <input type="text" id="w-bank-bank" placeholder="e.g. Barclays">
+          </div>
+          <div class="meta-field">
+            <label>Sort Code</label>
+            <input type="text" id="w-bank-sort" placeholder="00-00-00">
+          </div>
+          <div class="meta-field">
+            <label>Account Number</label>
+            <input type="text" id="w-bank-acc" placeholder="00000000">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions" style="justify-content:space-between;">
+      <button class="btn-secondary" id="welcome-skip-btn">Skip for now</button>
+      <button class="btn-primary" id="welcome-save-btn">Save & Get Started →</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
