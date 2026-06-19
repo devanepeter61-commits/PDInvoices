@@ -1,0 +1,1647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Peter Devane – Invoice Generator</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#1a2540;--navy-mid:#243050;--navy-light:#2e3d63;
+  --amber:#f0a500;--amber-light:#ffc840;
+  --slate:#6b7a99;--slate-light:#8e9dbe;
+  --bg:#f4f6fb;--white:#fff;--border:#dde3f0;
+  --text:#1a2540;--text-soft:#4a5568;
+  --green:#2dce89;--red:#f5365c;
+  --mono:'JetBrains Mono',monospace;--sans:'Inter',sans-serif;
+}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* ── HEADER ── */
+.app-header{background:linear-gradient(135deg,var(--navy) 0%,var(--navy-mid) 60%,#1e3a6e 100%);color:white;padding:22px 36px 0;box-shadow:0 4px 20px rgba(26,37,64,.3);}
+.app-header-top{display:flex;align-items:center;justify-content:space-between;padding-bottom:18px;}
+.brand h1{font-size:1.4rem;font-weight:700;letter-spacing:-.5px;}
+.brand p{font-size:.75rem;color:var(--slate-light);margin-top:2px;}
+.inv-counter{text-align:right;}
+.inv-counter span{display:block;font-size:.68rem;color:var(--slate-light);text-transform:uppercase;letter-spacing:1px;}
+.inv-counter strong{font-family:var(--mono);font-size:1.3rem;color:var(--amber);}
+
+/* ── TAB BAR ── */
+.tab-bar{display:flex;gap:4px;padding-top:4px;}
+.tab-btn{padding:10px 22px;border:none;background:transparent;color:var(--slate-light);font-family:var(--sans);font-size:.85rem;font-weight:600;cursor:pointer;border-radius:8px 8px 0 0;transition:background .15s,color .15s;position:relative;}
+.tab-btn:hover{color:white;background:rgba(255,255,255,.08);}
+.tab-btn.active{background:var(--bg);color:var(--navy);}
+.tab-btn.active::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:2px;background:var(--amber);}
+
+/* ── WORKSPACE ── */
+.workspace{max-width:1060px;margin:32px auto;padding:0 20px;}
+.tab-pane{display:none;}.tab-pane.active{display:block;}
+
+/* ── PANELS ── */
+.panel{background:var(--white);border-radius:12px;padding:22px 26px;margin-bottom:20px;border:1px solid var(--border);box-shadow:0 2px 8px rgba(26,37,64,.06);}
+.section-title{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--slate);margin-bottom:12px;padding-left:10px;border-left:3px solid var(--amber);}
+
+/* ── META GRID ── */
+.meta-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:18px;align-items:end;}
+.meta-field label{display:block;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--slate);margin-bottom:5px;}
+.meta-field input,.meta-field select,.meta-field textarea{width:100%;border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;font-family:var(--sans);font-size:.88rem;color:var(--text);background:var(--bg);outline:none;transition:border-color .2s;}
+.meta-field input:focus,.meta-field select:focus,.meta-field textarea:focus{border-color:var(--navy-light);background:white;}
+.meta-field textarea{resize:vertical;min-height:68px;}
+
+/* ── RATE PANEL ── */
+.rate-row{display:flex;align-items:center;gap:28px;}
+.rate-field{display:flex;align-items:center;gap:10px;}
+.rate-field label{font-size:.8rem;font-weight:600;color:var(--slate);white-space:nowrap;}
+.rate-field input{width:105px;border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;font-family:var(--mono);font-size:.95rem;color:var(--text);background:var(--bg);outline:none;transition:border-color .2s;}
+.rate-field input:focus{border-color:var(--navy-light);background:white;}
+.rate-hint{font-size:.75rem;color:var(--slate-light);flex:1;}
+
+/* ── STD HOURS ── */
+.std-inner{display:flex;flex-wrap:wrap;align-items:flex-end;gap:18px;}
+.std-field{display:flex;flex-direction:column;gap:5px;}
+.std-field label{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--slate);}
+.std-time-pair{display:flex;gap:4px;align-items:center;}
+.std-time-pair select,.std-field select{border:1.5px solid var(--border);border-radius:7px;padding:7px 8px;font-family:var(--mono);font-size:.86rem;color:var(--text);background:var(--bg);outline:none;transition:border-color .2s;width:62px;text-align:center;}
+.std-time-pair select:focus,.std-field select:focus{border-color:var(--navy-light);background:white;}
+.sep{font-weight:700;color:var(--slate);font-size:.9rem;}
+.std-preview{font-family:var(--mono);font-size:.85rem;font-weight:600;color:var(--navy);padding:8px 0 4px;min-width:72px;align-self:flex-end;}
+.std-hint{font-size:.73rem;color:var(--slate-light);flex:1;align-self:flex-end;padding-bottom:4px;}
+.btn-apply{padding:8px 18px;background:var(--navy);border:none;border-radius:7px;font-family:var(--sans);font-size:.8rem;font-weight:600;color:white;cursor:pointer;white-space:nowrap;transition:background .15s,transform .1s;align-self:flex-end;}
+.btn-apply:hover{background:var(--navy-light);transform:translateY(-1px);}
+
+/* ── ENTRIES TABLE ── */
+.entries-panel{background:var(--white);border-radius:12px;border:1px solid var(--border);box-shadow:0 2px 8px rgba(26,37,64,.06);margin-bottom:20px;overflow:hidden;}
+.entries-header{background:var(--navy);padding:12px 18px;display:grid;grid-template-columns:36px 140px 1fr 1fr 130px 1fr 40px;gap:8px;align-items:center;}
+.entries-header span{font-size:.65rem;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--slate-light);}
+.entry-row{display:grid;grid-template-columns:36px 140px 1fr 1fr 130px 1fr 40px;gap:8px;align-items:center;padding:7px 18px;border-bottom:1px solid var(--bg);transition:background .15s;animation:rowIn .2s ease;}
+@keyframes rowIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+.entry-row:hover{background:#f8f9fd;}
+.entry-row:last-child{border-bottom:none;}
+.entry-row.row-selected{background:#fffbf0;border-left:3px solid var(--amber);}
+.entry-row.row-selected:hover{background:#fff6dd;}
+.entry-row input[type="date"],.entry-row select{width:100%;border:1.5px solid var(--border);border-radius:6px;padding:6px 8px;font-family:var(--sans);font-size:.82rem;color:var(--text);background:var(--bg);outline:none;transition:border-color .2s;}
+.entry-row input:focus,.entry-row select:focus{border-color:var(--navy-light);background:white;}
+.time-pair{display:flex;gap:3px;align-items:center;}
+.time-pair select{border:1.5px solid var(--border);border-radius:6px;padding:6px 5px;font-family:var(--mono);font-size:.82rem;color:var(--text);background:var(--bg);outline:none;width:54px;text-align:center;}
+.time-pair select:focus{border-color:var(--navy-light);background:white;}
+.row-check,.row-ctrl{display:flex;align-items:center;justify-content:center;}
+.row-check input[type="checkbox"]{width:15px;height:15px;cursor:pointer;accent-color:var(--amber);}
+.hours-cell{font-family:var(--mono);font-size:.88rem;font-weight:600;color:var(--navy);text-align:right;padding-right:4px;}
+.hours-cell.zero{color:var(--slate-light);}
+.btn-remove{width:30px;height:30px;border:none;border-radius:6px;background:transparent;color:var(--slate-light);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s;margin:0 auto;}
+.btn-remove:hover{background:#fee;color:var(--red);}
+.add-row-btn{display:flex;align-items:center;gap:8px;margin:8px 18px 12px;background:none;border:1.5px dashed var(--border);border-radius:8px;padding:8px 14px;color:var(--slate);font-size:.83rem;font-family:var(--sans);font-weight:500;cursor:pointer;width:calc(100% - 36px);transition:border-color .2s,color .2s,background .2s;}
+.add-row-btn:hover{border-color:var(--amber);color:var(--amber);background:#fff9ec;}
+
+/* ── TOTALS BAR ── */
+.totals-bar{background:var(--navy);border-radius:12px;padding:18px 26px;margin-bottom:22px;display:flex;align-items:center;justify-content:flex-end;gap:36px;box-shadow:0 4px 16px rgba(26,37,64,.2);}
+.total-item{text-align:right;}
+.total-item span{display:block;font-size:.68rem;text-transform:uppercase;letter-spacing:.8px;color:var(--slate-light);margin-bottom:3px;}
+.total-item strong{font-family:var(--mono);font-size:1.2rem;color:white;}
+.total-item.hl strong{color:var(--amber);font-size:1.4rem;}
+.total-divider{width:1px;height:36px;background:var(--navy-light);}
+
+/* ── ACTION BUTTONS ── */
+.actions{display:flex;gap:12px;justify-content:flex-end;margin-bottom:36px;}
+.btn-secondary{padding:11px 22px;border:1.5px solid var(--border);background:white;border-radius:8px;font-family:var(--sans);font-size:.86rem;font-weight:600;color:var(--text-soft);cursor:pointer;transition:border-color .2s,color .2s;}
+.btn-secondary:hover{border-color:var(--navy);color:var(--navy);}
+.btn-primary{padding:11px 28px;background:linear-gradient(135deg,var(--amber) 0%,var(--amber-light) 100%);border:none;border-radius:8px;font-family:var(--sans);font-size:.86rem;font-weight:700;color:var(--navy);cursor:pointer;box-shadow:0 3px 12px rgba(240,165,0,.35);transition:transform .15s,box-shadow .15s;letter-spacing:.3px;}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 5px 18px rgba(240,165,0,.45);}
+.btn-primary:active{transform:translateY(0);}
+.btn-danger{padding:11px 22px;border:1.5px solid var(--red);background:white;border-radius:8px;font-family:var(--sans);font-size:.86rem;font-weight:600;color:var(--red);cursor:pointer;transition:background .2s,color .2s;}
+.btn-danger:hover{background:var(--red);color:white;}
+
+/* ── MODAL (invoice preview) ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(10,15,30,.65);z-index:1000;backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal{background:white;border-radius:16px;max-width:820px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.modal-actions{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;background:var(--bg);border-radius:0 0 16px 16px;position:sticky;bottom:0;flex-wrap:wrap;}
+
+/* ── INVOICE PRINT LAYOUT ── */
+#invoice-preview{padding:44px 50px 32px;font-family:var(--sans);color:#1a2540;line-height:1.5;}
+.inv-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:36px;padding-bottom:24px;border-bottom:2px solid var(--navy);}
+.inv-from h2{font-size:1.35rem;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.inv-from address{font-style:normal;font-size:.8rem;color:#4a5568;line-height:1.7;}
+.inv-badge{text-align:right;}
+.inv-badge .inv-label{font-size:1.9rem;font-weight:800;color:var(--navy);letter-spacing:-1px;display:block;}
+.inv-badge .inv-num{font-family:var(--mono);font-size:.95rem;color:var(--amber);font-weight:600;display:block;margin-top:2px;}
+.inv-badge .inv-date{font-size:.78rem;color:var(--slate);display:block;margin-top:4px;}
+.inv-to-section{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-bottom:32px;}
+.inv-to-block h4{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--slate);margin-bottom:7px;}
+.inv-to-block p{font-size:.83rem;color:var(--text);line-height:1.7;}
+.inv-table{width:100%;border-collapse:collapse;margin-bottom:24px;font-size:.81rem;}
+.inv-table thead tr{background:var(--navy);color:white;}
+.inv-table thead th{padding:9px 12px;text-align:left;font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.6px;}
+.inv-table thead th:last-child,.inv-table thead th:nth-last-child(2){text-align:right;}
+.inv-table tbody tr{border-bottom:1px solid var(--border);}
+.inv-table tbody tr:nth-child(even){background:#f9fafc;}
+.inv-table tbody td{padding:9px 12px;font-size:.8rem;color:var(--text);}
+.inv-table tbody td:last-child,.inv-table tbody td:nth-last-child(2){text-align:right;font-family:var(--mono);}
+.inv-table tfoot tr td{padding:7px 12px;font-size:.81rem;}
+.inv-table tfoot .total-row td{border-top:2px solid var(--navy);font-weight:700;font-size:.92rem;padding-top:9px;}
+.inv-table tfoot td:last-child{text-align:right;font-family:var(--mono);}
+.inv-table tfoot td:first-child{color:var(--slate);}
+.inv-footer{margin-top:28px;padding-top:18px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-end;font-size:.73rem;color:var(--slate);}
+.inv-footer .payment-terms p{margin-bottom:3px;}
+.inv-footer .payment-terms strong{color:var(--text);}
+.inv-footer .thank-you{font-size:.83rem;font-weight:600;color:var(--navy);text-align:right;}
+
+/* ── LOG TAB ── */
+.log-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px;}
+.log-header h2{font-size:1rem;font-weight:700;color:var(--navy);}
+.log-stats{display:flex;gap:16px;}
+.log-stat{text-align:center;}
+.log-stat span{display:block;font-size:.66rem;text-transform:uppercase;letter-spacing:.8px;color:var(--slate);}
+.log-stat strong{font-family:var(--mono);font-size:1.05rem;color:var(--navy);}
+.log-stat strong.amber{color:var(--amber);}
+.log-table{width:100%;border-collapse:collapse;}
+.log-table thead tr{background:var(--navy);}
+.log-table thead th{padding:10px 14px;text-align:left;font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.7px;color:var(--slate-light);}
+.log-table tbody tr{border-bottom:1px solid var(--border);transition:background .15s;}
+.log-table tbody tr:hover{background:#f8f9fd;}
+.log-table tbody td{padding:10px 14px;font-size:.83rem;color:var(--text);}
+.log-table tbody td.mono{font-family:var(--mono);}
+.paid-toggle{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-size:.78rem;font-weight:600;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:white;transition:all .2s;white-space:nowrap;}
+.paid-toggle.paid{background:#e8faf3;border-color:var(--green);color:#1a8a5a;}
+.paid-toggle.unpaid{background:#fff3e0;border-color:var(--amber);color:#b37400;}
+.paid-toggle .dot{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;}
+.log-empty{text-align:center;padding:48px 20px;color:var(--slate);font-size:.9rem;}
+.log-empty svg{display:block;margin:0 auto 14px;opacity:.3;}
+.btn-del-log{background:none;border:none;color:var(--slate-light);cursor:pointer;padding:4px 8px;border-radius:4px;font-size:1rem;transition:color .15s;}
+.btn-del-log:hover{color:var(--red);}
+
+/* ── SETTINGS TAB ── */
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+.settings-field{display:flex;flex-direction:column;gap:5px;}
+.settings-field label{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--slate);}
+.settings-field input,.settings-field textarea,.settings-field select{border:1.5px solid var(--border);border-radius:7px;padding:8px 11px;font-family:var(--sans);font-size:.88rem;color:var(--text);background:var(--bg);outline:none;transition:border-color .2s;width:100%;}
+.settings-field input:focus,.settings-field textarea:focus,.settings-field select:focus{border-color:var(--navy-light);background:white;}
+.settings-field textarea{resize:vertical;min-height:72px;}
+.settings-field.full{grid-column:1/-1;}
+.toggle-row{display:flex;align-items:center;gap:12px;padding:10px 0;}
+.toggle-label{font-size:.83rem;font-weight:600;color:var(--text-soft);}
+.toggle-switch{position:relative;display:inline-block;width:44px;height:24px;}
+.toggle-switch input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;cursor:pointer;inset:0;background:var(--border);border-radius:24px;transition:.3s;}
+.toggle-slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.3s;}
+.toggle-switch input:checked+.toggle-slider{background:var(--amber);}
+.toggle-switch input:checked+.toggle-slider:before{transform:translateX(20px);}
+.settings-save-bar{display:flex;gap:12px;justify-content:flex-end;margin-top:20px;}
+
+/* ── PRINT ── */
+@media print{
+  .app-header,.workspace>*:not(#print-frame-container),.modal-overlay,.tab-bar{display:none!important;}
+  #print-frame-container{display:block!important;position:fixed;inset:0;}
+  #invoice-print-content{display:block!important;}
+}
+#invoice-print-content{display:none;}
+/* ══ MOBILE RESPONSIVE ══════════════════════════════════════════ */
+@media (max-width: 700px) {
+
+  /* Header */
+  .app-header { padding: 16px 16px 0; }
+  .app-header-top { flex-direction: column; align-items: flex-start; gap: 10px; padding-bottom: 14px; }
+  .brand h1 { font-size: 1.2rem; }
+  .brand p { font-size: .7rem; white-space: normal; }
+  .inv-counter { align-self: flex-end; margin-top: -42px; }
+  .inv-counter strong { font-size: 1.15rem; }
+
+  /* Tabs */
+  .tab-bar { gap: 2px; }
+  .tab-btn { padding: 9px 14px; font-size: .78rem; }
+
+  /* Workspace */
+  .workspace { margin: 16px auto; padding: 0 12px; }
+
+  /* Panel */
+  .panel { padding: 16px; margin-bottom: 14px; border-radius: 10px; }
+
+  /* Meta grid → single column */
+  .meta-grid { grid-template-columns: 1fr; gap: 12px; }
+  .edit-meta-grid { grid-template-columns: 1fr !important; }
+
+  .meta-field textarea { min-height: 56px; }
+
+  /* Rate row → stack */
+  .rate-row { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .rate-field { width: 100%; }
+  .rate-field label { width: auto; }
+  .rate-field input { width: 100%; }
+  .rate-hint { display: none; }
+
+  /* Std hours → stack */
+  .std-inner { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .std-field { width: 100%; }
+  .std-time-pair { gap: 6px; }
+  .std-time-pair select { width: 70px; font-size: .9rem; padding: 8px 6px; }
+  .std-field select { width: 100%; max-width: 160px; }
+  .std-preview { font-size: 1rem; padding: 0; }
+  .std-hint { display: none; }
+  .btn-apply { width: 100%; text-align: center; justify-content: center; padding: 11px; font-size: .85rem; }
+
+  /* Section title */
+  .section-title { font-size: .68rem; margin-bottom: 10px; }
+
+  /* Entries panel — scroll horizontally on very small phones if needed */
+  .entries-panel { border-radius: 10px; overflow-x: auto; }
+
+  /* Header row: collapse to key columns */
+  .entries-header {
+    grid-template-columns: 36px 110px 90px 90px 62px 58px 32px;
+    gap: 5px;
+    padding: 10px 10px;
+  }
+  .entries-header span { font-size: .6rem; letter-spacing: .4px; }
+
+  /* Entry rows: match header */
+  .entry-row {
+    grid-template-columns: 36px 110px 90px 90px 62px 58px 32px;
+    gap: 5px;
+    padding: 6px 10px;
+    min-width: 500px; /* allow scroll if phone < 500px */
+  }
+  .entry-row input[type="date"] { font-size: .75rem; padding: 5px 5px; }
+  .time-pair { gap: 2px; }
+  .time-pair select { width: 42px; font-size: .75rem; padding: 5px 2px; }
+  .time-pair .sep { font-size: .8rem; }
+  .entry-row select { font-size: .75rem; padding: 5px 4px; }
+  .hours-cell { font-size: .78rem; }
+  .btn-remove { width: 26px; height: 26px; font-size: 1rem; }
+
+  .add-row-btn { margin: 6px 10px 10px; width: calc(100% - 20px); font-size: .8rem; padding: 8px 12px; }
+
+  /* Totals bar */
+  .totals-bar { gap: 16px; padding: 14px 16px; border-radius: 10px; justify-content: space-between; }
+  .total-item span { font-size: .62rem; }
+  .total-item strong { font-size: 1rem; }
+  .total-item.hl strong { font-size: 1.2rem; }
+  .total-divider { height: 28px; }
+
+  /* Actions */
+  .actions { flex-direction: column-reverse; gap: 8px; margin-bottom: 24px; }
+  .actions .btn-primary, .actions .btn-secondary { width: 100%; text-align: center; }
+
+  /* Modal */
+  .modal-overlay { padding: 0; align-items: flex-end; }
+  .modal { border-radius: 16px 16px 0 0; max-height: 95vh; width: 100%; }
+  #invoice-preview { padding: 24px 20px 16px; }
+  .modal-actions { flex-direction: column; gap: 8px; }
+  .modal-actions button { width: 100%; text-align: center; }
+
+  /* Invoice preview on mobile */
+  .inv-top { flex-direction: column; gap: 14px; margin-bottom: 20px; padding-bottom: 16px; }
+  .inv-badge { text-align: left; }
+  .inv-badge .inv-label { font-size: 1.4rem; }
+  .inv-to-section { grid-template-columns: 1fr; gap: 16px; margin-bottom: 20px; }
+  .inv-table thead th, .inv-table tbody td, .inv-table tfoot td { padding: 7px 8px; font-size: .72rem; }
+  .inv-footer { flex-direction: column; gap: 10px; align-items: flex-start; }
+
+  /* Log tab */
+  .log-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .log-stats { gap: 12px; flex-wrap: wrap; }
+  .log-stat strong { font-size: .92rem; }
+  .log-table { font-size: .78rem; display: block; overflow-x: auto; }
+  .btn-edit-log { background:none; border:1.5px solid var(--border); border-radius:6px; padding:4px 9px; font-size:.85rem; cursor:pointer; transition:background .15s,border-color .15s; }
+  .btn-edit-log:hover { background:#f0fff4; border-color:var(--green); }
+  .btn-view-log { font-size: .78rem; padding: 3px 7px; }
+  .log-table thead, .log-table tbody, .log-table tr { display: table; width: 100%; table-layout: fixed; }
+  .log-table table { min-width: 520px; }
+  .paid-toggle { font-size: .72rem; padding: 4px 9px; }
+
+  /* Settings */
+  .settings-grid { grid-template-columns: 1fr; gap: 14px; }
+  .settings-field.full { grid-column: 1; }
+  .toggle-row { padding: 8px 0; }
+  .settings-save-bar { flex-direction: column; }
+  .settings-save-bar .btn-primary { width: 100%; text-align: center; }
+}
+
+/* Slightly wider phones (401-700px) — 2-col settings still works */
+@media (min-width: 480px) and (max-width: 700px) {
+  .settings-grid { grid-template-columns: 1fr 1fr; }
+  .settings-field.full { grid-column: 1 / -1; }
+  .meta-grid { grid-template-columns: 1fr 1fr; }
+}
+
+
+  .row-ctrl { display:flex; flex-direction:column; align-items:center; gap:1px; }
+  .btn-move { width:22px; height:15px; border:none; border-radius:3px; background:transparent; color:var(--slate-light); font-size:.6rem; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1; padding:0; transition:background .12s,color .12s; }
+  .btn-move:hover { background:var(--border); color:var(--navy); }
+  .btn-move:disabled { opacity:.2; cursor:default; }
+  .row-ctrl input[type="checkbox"] { width:14px; height:14px; cursor:pointer; accent-color:var(--amber); margin:1px 0; }
+  .btn-edit-log { background:none; border:1.5px solid var(--border); border-radius:6px; padding:4px 9px; font-size:.85rem; cursor:pointer; transition:background .15s,border-color .15s; }
+  .btn-edit-log:hover { background:#f0fff4; border-color:var(--green); }
+  .btn-view-log { background:none; border:1.5px solid var(--border); border-radius:6px; padding:4px 9px; font-size:.85rem; cursor:pointer; transition:background .15s,border-color .15s; }
+  .btn-view-log:hover { background:#f0f4ff; border-color:var(--navy-light); }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-header-top">
+    <div class="brand">
+      <h1>Peter Devane</h1>
+      <p>Invoice Generator · 43 Audley Street, Ashton-under-Lyne, OL6 6RB</p>
+    </div>
+    <div class="inv-counter">
+      <span>Next Invoice</span>
+      <strong id="next-inv-display">#001</strong>
+    </div>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('invoice',this)">📄 Invoice</button>
+    <button class="tab-btn" onclick="switchTab('log',this)">📋 Log</button>
+    <button class="tab-btn" onclick="switchTab('settings',this)">⚙️ Settings</button>
+  </div>
+</header>
+
+<div class="workspace">
+
+  <!-- ══ INVOICE TAB ══ -->
+  <div id="tab-invoice" class="tab-pane active">
+
+    <div class="panel">
+      <div class="meta-grid">
+        <div class="meta-field">
+          <label>Invoice Date</label>
+          <input type="date" id="inv-date">
+        </div>
+        <div class="meta-field">
+          <label>Client / Company Name</label>
+          <input type="text" id="client-name" placeholder="e.g. HND Surveyors Ltd">
+        </div>
+        <div class="meta-field">
+          <label>Client Address</label>
+          <textarea id="client-address" placeholder="Street&#10;Town&#10;Postcode"></textarea>
+        </div>
+        <div class="meta-field">
+          <label>Payment Terms</label>
+          <select id="payment-terms">
+            <option value="immediate">Payment Due Immediately</option>
+            <option value="7">Payment Due Within 7 Days</option>
+            <option value="14">Payment Due Within 14 Days</option>
+            <option value="30" selected>Payment Due Within 30 Days</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="rate-row">
+        <div class="rate-field">
+          <label>Day Rate (£)</label>
+          <input type="number" id="day-rate" value="250" min="0" step="0.01">
+        </div>
+        <div class="rate-field">
+          <label>Working Day (hrs)</label>
+          <input type="number" id="day-hours" value="8" min="1" max="24" step="0.5">
+        </div>
+        <p class="rate-hint">Hourly rate = day rate ÷ working day length.</p>
+      </div>
+    </div>
+
+    <p class="section-title">Standard Hours Template</p>
+    <div class="panel">
+      <div class="std-inner">
+        <div class="std-field">
+          <label>Start</label>
+          <div class="std-time-pair">
+            <select id="std-start-h"></select>
+            <span class="sep">:</span>
+            <select id="std-start-m">
+              <option value="00" selected>00</option><option value="15">15</option>
+              <option value="30">30</option><option value="45">45</option>
+              <option value="60">60</option>
+            </select>
+          </div>
+        </div>
+        <div class="std-field">
+          <label>Finish</label>
+          <div class="std-time-pair">
+            <select id="std-finish-h"></select>
+            <span class="sep">:</span>
+            <select id="std-finish-m">
+              <option value="00" selected>00</option><option value="15">15</option>
+              <option value="30">30</option><option value="45">45</option>
+              <option value="60">60</option>
+            </select>
+          </div>
+        </div>
+        <div class="std-field">
+          <label>Break (min)</label>
+          <select id="std-break">
+            <option value="0">00</option><option value="15">15</option>
+            <option value="30" selected>30</option><option value="45">45</option>
+            <option value="60">60</option>
+          </select>
+        </div>
+        <div class="std-preview" id="std-preview">— h</div>
+        <p class="std-hint">New rows use these times. Tick rows then click apply to update existing ones.</p>
+        <button class="btn-apply" id="apply-std-btn">Apply to Selected</button>
+      </div>
+    </div>
+
+    <p class="section-title">Time Entries</p>
+    <div class="entries-panel">
+      <div class="entries-header">
+        <span title="Select all"><input type="checkbox" id="select-all-rows" style="cursor:pointer;accent-color:var(--amber);width:15px;height:15px;"></span>
+        <span>Date</span>
+        <span>Start</span>
+        <span>Finish</span>
+        <span>Break (min)</span>
+        <span style="text-align:right">Hours</span>
+        <span></span>
+      </div>
+      <div id="entries-body"></div>
+      <button class="add-row-btn" id="add-row-btn">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Add Day
+      </button>
+    </div>
+
+    <div class="totals-bar">
+      <div class="total-item"><span>Total Days</span><strong id="total-days">0.00</strong></div>
+      <div class="total-divider"></div>
+      <div class="total-item"><span>Total Hours</span><strong id="total-hours">0.00</strong></div>
+      <div class="total-divider"></div>
+      <div class="total-item hl"><span>Invoice Total</span><strong id="total-amount">£0.00</strong></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-secondary" id="clear-btn">Clear All</button>
+      <button class="btn-primary" id="produce-btn">Produce Invoice →</button>
+    </div>
+  </div>
+
+  <!-- ══ LOG TAB ══ -->
+  <div id="tab-log" class="tab-pane">
+    <div class="panel">
+      <div class="log-header">
+        <h2>Invoice Log</h2>
+        <div class="log-stats">
+          <div class="log-stat"><span>Total Invoiced</span><strong id="log-total" class="amber">£0.00</strong></div>
+          <div class="log-stat"><span>Outstanding</span><strong id="log-outstanding">£0.00</strong></div>
+          <div class="log-stat"><span>Paid</span><strong id="log-paid">£0.00</strong></div>
+        </div>
+      </div>
+      <div id="log-body">
+        <div class="log-empty">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>
+          No invoices logged yet. Confirm an invoice to add it here.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SETTINGS TAB ══ -->
+  <div id="tab-settings" class="tab-pane">
+    <div class="panel">
+      <p class="section-title" style="margin-bottom:18px;">Your Details</p>
+      <div class="settings-grid">
+        <div class="settings-field"><label>Your Name</label><input type="text" id="s-name" placeholder="Peter Devane"></div>
+        <div class="settings-field"><label>Default Day Rate (£)</label><input type="number" id="s-rate" placeholder="250"></div>
+        <div class="settings-field full"><label>Your Address</label><textarea id="s-address" placeholder="43 Audley Street&#10;Ashton-under-Lyne&#10;Lancashire&#10;OL6 6RB"></textarea></div>
+      </div>
+    </div>
+    <div class="panel">
+      <p class="section-title" style="margin-bottom:18px;">Bank Details (shown on invoice)</p>
+      <div class="settings-grid">
+        <div class="settings-field"><label>Account Name</label><input type="text" id="s-bank-name" placeholder="Peter Devane"></div>
+        <div class="settings-field"><label>Bank Name</label><input type="text" id="s-bank-bank" placeholder="e.g. Barclays"></div>
+        <div class="settings-field"><label>Sort Code</label><input type="text" id="s-bank-sort" placeholder="00-00-00"></div>
+        <div class="settings-field"><label>Account Number</label><input type="text" id="s-bank-acc" placeholder="00000000"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <p class="section-title" style="margin-bottom:14px;">VAT</p>
+      <div class="toggle-row">
+        <label class="toggle-switch"><input type="checkbox" id="s-vat-reg"><span class="toggle-slider"></span></label>
+        <span class="toggle-label">VAT Registered</span>
+      </div>
+      <div id="vat-number-field" style="display:none;margin-top:12px;">
+        <div class="settings-field"><label>VAT Registration Number</label><input type="text" id="s-vat-num" placeholder="GB 000 000 000"></div>
+      </div>
+    </div>
+    <div class="settings-save-bar">
+      <button class="btn-primary" id="save-settings-btn">Save Settings</button>
+    </div>
+  </div>
+
+</div><!-- /workspace -->
+
+<!-- ── INVOICE MODAL ── -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div id="invoice-preview"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="modal-close-btn">← Back</button>
+      <button class="btn-secondary" id="modal-print-btn">🖨 Save as PDF</button>
+      <button class="btn-primary" id="modal-confirm-btn">✓ Confirm &amp; Log Invoice</button>
+    </div>
+  </div>
+</div>
+
+<!-- hidden print container -->
+<div id="invoice-print-content"></div>
+
+<script>
+(function(){
+'use strict';
+const LS = {
+  INV_NUM:  'pd_inv_num',
+  DRAFT:    'pd_inv_draft',
+  LOG:      'pd_inv_log',
+  SETTINGS: 'pd_inv_settings',
+};
+
+// ── HELPERS ──────────────────────────────────────────────────────
+function today(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(str){
+  if(!str) return '';
+  const [y,m,d]=str.split('-');
+  return `${parseInt(d)} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m)-1]} ${y}`;
+}
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtNum(n){ return '#'+String(n).padStart(3,'0'); }
+function getNextNum(){ return parseInt(localStorage.getItem(LS.INV_NUM)||'0')+1; }
+function bumpNum(){ localStorage.setItem(LS.INV_NUM, getNextNum()); }
+function updateNumDisplay(){ document.getElementById('next-inv-display').textContent = fmtNum(getNextNum()); }
+
+function buildHrOpts(sel){
+  let s='';
+  for(let h=6;h<=22;h++){const v=String(h).padStart(2,'0');s+=`<option value="${v}"${v===sel?' selected':''}>${v}</option>`;}
+  return s;
+}
+function buildMinOpts(sel){
+  return ['00','15','30','45'].map(m=>`<option value="${m}"${m===sel?' selected':''}>${m}</option>`).join('');
+}
+
+// ── TABS ─────────────────────────────────────────────────────────
+window.switchTab = function(name, btn){
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+  if(name==='log') renderLog();
+};
+
+// ── SETTINGS ─────────────────────────────────────────────────────
+function loadSettings(){
+  try{ return JSON.parse(localStorage.getItem(LS.SETTINGS)||'{}'); }catch(e){ return {}; }
+}
+function saveSettings(){
+  const s={
+    name:    document.getElementById('s-name').value.trim(),
+    address: document.getElementById('s-address').value.trim(),
+    rate:    document.getElementById('s-rate').value,
+    bankName:document.getElementById('s-bank-name').value.trim(),
+    bankBank:document.getElementById('s-bank-bank').value.trim(),
+    bankSort:document.getElementById('s-bank-sort').value.trim(),
+    bankAcc: document.getElementById('s-bank-acc').value.trim(),
+    vatReg:  document.getElementById('s-vat-reg').checked,
+    vatNum:  document.getElementById('s-vat-num').value.trim(),
+  };
+  localStorage.setItem(LS.SETTINGS,JSON.stringify(s));
+  alert('Settings saved.');
+}
+function populateSettingsForm(){
+  const s=loadSettings();
+  if(s.name)    document.getElementById('s-name').value    = s.name;
+  if(s.address) document.getElementById('s-address').value = s.address;
+  if(s.rate)    document.getElementById('s-rate').value    = s.rate;
+  if(s.bankName)document.getElementById('s-bank-name').value = s.bankName;
+  if(s.bankBank)document.getElementById('s-bank-bank').value = s.bankBank;
+  if(s.bankSort)document.getElementById('s-bank-sort').value = s.bankSort;
+  if(s.bankAcc) document.getElementById('s-bank-acc').value  = s.bankAcc;
+  if(s.vatReg)  { document.getElementById('s-vat-reg').checked=true; document.getElementById('vat-number-field').style.display='block'; }
+  if(s.vatNum)  document.getElementById('s-vat-num').value = s.vatNum;
+  // Apply default rate if set
+  if(s.rate) document.getElementById('day-rate').value = s.rate;
+}
+document.getElementById('s-vat-reg').addEventListener('change',function(){
+  document.getElementById('vat-number-field').style.display = this.checked?'block':'none';
+});
+document.getElementById('save-settings-btn').addEventListener('click', saveSettings);
+
+// ── STD HOURS ────────────────────────────────────────────────────
+(function initStdHrSelects(){
+  const sh=document.getElementById('std-start-h');
+  const fh=document.getElementById('std-finish-h');
+  for(let h=6;h<=22;h++){
+    const v=String(h).padStart(2,'0');
+    const os=document.createElement('option'); os.value=v; os.textContent=v; if(h===9)os.selected=true; sh.appendChild(os);
+    const of=document.createElement('option'); of.value=v; of.textContent=v; if(h===17)of.selected=true; fh.appendChild(of);
+  }
+})();
+
+function getStdStart(){ return (document.getElementById('std-start-h').value||'09')+':'+(document.getElementById('std-start-m').value||'00'); }
+function getStdFinish(){ return (document.getElementById('std-finish-h').value||'17')+':'+(document.getElementById('std-finish-m').value||'00'); }
+function getStdBreak(){ return document.getElementById('std-break').value||'30'; }
+
+function updateStdPreview(){
+  const [sh,sm]=getStdStart().split(':').map(Number);
+  const [fh,fm]=getStdFinish().split(':').map(Number);
+  const mins=(fh*60+fm)-(sh*60+sm)-parseInt(getStdBreak());
+  document.getElementById('std-preview').textContent = mins>0?(mins/60).toFixed(2)+' h':'— h';
+}
+['std-start-h','std-start-m','std-finish-h','std-finish-m','std-break'].forEach(id=>{
+  document.getElementById(id).addEventListener('change',()=>{ updateStdPreview(); saveDraft(); });
+});
+updateStdPreview();
+
+document.getElementById('apply-std-btn').addEventListener('click',()=>{
+  const ticked=document.querySelectorAll('.entry-row .r-select:checked');
+  if(!ticked.length){ alert('Tick the checkboxes on the rows you want to update.'); return; }
+  const [sh,sm]=getStdStart().split(':');
+  const [fh,fm]=getStdFinish().split(':');
+  ticked.forEach(cb=>{
+    const row=cb.closest('.entry-row');
+    row.querySelector('.r-start-h').value=sh; row.querySelector('.r-start-m').value=sm;
+    row.querySelector('.r-finish-h').value=fh; row.querySelector('.r-finish-m').value=fm;
+    row.querySelector('.r-break').value=getStdBreak();
+    calcRow(parseInt(row.dataset.id));
+  });
+  recalcTotals(); saveDraft();
+});
+
+document.getElementById('select-all-rows').addEventListener('change',function(){
+  document.querySelectorAll('.entry-row .r-select').forEach(cb=>{
+    cb.checked=this.checked;
+    cb.closest('.entry-row').classList.toggle('row-selected',this.checked);
+  });
+});
+function updateSelectAll(){
+  const all=document.querySelectorAll('.entry-row .r-select');
+  const ticked=document.querySelectorAll('.entry-row .r-select:checked');
+  const sa=document.getElementById('select-all-rows');
+  sa.checked=all.length>0&&ticked.length===all.length;
+  sa.indeterminate=ticked.length>0&&ticked.length<all.length;
+}
+
+// ── ROW MANAGEMENT ───────────────────────────────────────────────
+let rowId=0;
+function addRow(data){
+  rowId++;
+  const id=rowId;
+  const row=document.createElement('div');
+  row.className='entry-row'; row.dataset.id=id;
+  const s=data?.start||getStdStart(); const f=data?.finish||getStdFinish();
+  const [sh,sm]=s.split(':'); const [fh,fm]=f.split(':');
+  const brk=data?.brk||getStdBreak();
+  row.innerHTML=`
+    <div class="row-ctrl">
+        <button class="btn-move btn-up" title="Move up">▲</button>
+        <input type="checkbox" class="r-select" title="Select row">
+        <button class="btn-move btn-dn" title="Move down">▼</button>
+      </div>
+    <input type="date" class="r-date" value="${data?.date||today()}">
+    <div class="time-pair">
+      <select class="r-start-h">${buildHrOpts(sh)}</select>
+      <span class="sep">:</span>
+      <select class="r-start-m">${buildMinOpts(sm)}</select>
+    </div>
+    <div class="time-pair">
+      <select class="r-finish-h">${buildHrOpts(fh)}</select>
+      <span class="sep">:</span>
+      <select class="r-finish-m">${buildMinOpts(fm)}</select>
+    </div>
+    <select class="r-break">
+      <option value="0" ${brk==='0'?'selected':''}>00</option>
+      <option value="15" ${brk==='15'?'selected':''}>15</option>
+      <option value="30" ${brk==='30'||(!data?.brk&&getStdBreak()==='30')?'selected':''}>30</option>
+      <option value="45" ${brk==='45'?'selected':''}>45</option>
+      <option value="60" ${brk==='60'?'selected':''}>60</option>
+    </select>
+    <div class="hours-cell" id="hours-${id}">—</div>
+    <button class="btn-remove" title="Remove">×</button>`;
+  document.getElementById('entries-body').appendChild(row);
+  ['.r-start-h','.r-start-m','.r-finish-h','.r-finish-m','.r-break'].forEach(sel=>{
+    row.querySelector(sel).addEventListener('change',()=>{ calcRow(id); recalcTotals(); saveDraft(); });
+  });
+  row.querySelector('.r-date').addEventListener('change', saveDraft);
+  row.querySelector('.btn-remove').addEventListener('click',()=>{ row.remove(); recalcTotals(); saveDraft(); updateSelectAll(); updateMoveButtons(); updateMoveButtons(); });
+  row.querySelector('.r-select').addEventListener('change',function(){ row.classList.toggle('row-selected',this.checked); updateSelectAll(); });
+    row.querySelector('.btn-up').addEventListener('click',()=>moveRow(row,'up'));
+    row.querySelector('.btn-dn').addEventListener('click',()=>moveRow(row,'dn'));
+  calcRow(id); recalcTotals();
+  updateMoveButtons();
+}
+
+
+  function moveRow(row, dir) {
+    const body = document.getElementById('entries-body');
+    if (dir === 'up') {
+      const prev = row.previousElementSibling;
+      if (prev) body.insertBefore(row, prev);
+    } else {
+      const next = row.nextElementSibling;
+      if (next) body.insertBefore(next, row);
+    }
+    updateMoveButtons();
+    saveDraft();
+  }
+
+  function updateMoveButtons() {
+    const rows = document.querySelectorAll('.entry-row');
+    rows.forEach((row, i) => {
+      const up = row.querySelector('.btn-up');
+      const dn = row.querySelector('.btn-dn');
+      if (up) up.disabled = (i === 0);
+      if (dn) dn.disabled = (i === rows.length - 1);
+    });
+  }
+
+function calcRow(id){
+  const row=document.querySelector(`.entry-row[data-id="${id}"]`);
+  if(!row) return 0;
+  const sh=row.querySelector('.r-start-h').value; const sm=row.querySelector('.r-start-m').value;
+  const fh=row.querySelector('.r-finish-h').value; const fm=row.querySelector('.r-finish-m').value;
+  const brk=parseInt(row.querySelector('.r-break').value)||0;
+  const cell=document.getElementById('hours-'+id);
+  const mins=(parseInt(fh)*60+parseInt(fm))-(parseInt(sh)*60+parseInt(sm))-brk;
+  if(mins<=0){ cell.textContent='0.00 h'; cell.className='hours-cell zero'; return 0; }
+  const hrs=mins/60;
+  cell.textContent=hrs.toFixed(2)+' h'; cell.className='hours-cell';
+  return hrs;
+}
+
+function recalcTotals(){
+  let totalH=0;
+  document.querySelectorAll('.entry-row').forEach(row=>{ totalH+=calcRow(parseInt(row.dataset.id)); });
+  const dayH=parseFloat(document.getElementById('day-hours').value)||8;
+  const dayRate=parseFloat(document.getElementById('day-rate').value)||0;
+  const hourRate=dayH>0?dayRate/dayH:0;
+  document.getElementById('total-hours').textContent=totalH.toFixed(2);
+  document.getElementById('total-days').textContent=(dayH>0?totalH/dayH:0).toFixed(2);
+  document.getElementById('total-amount').textContent='£'+(totalH*hourRate).toFixed(2);
+}
+
+document.getElementById('add-row-btn').addEventListener('click',()=>{ addRow(); saveDraft(); });
+document.getElementById('day-rate').addEventListener('input',()=>{ recalcTotals(); saveDraft(); });
+document.getElementById('day-hours').addEventListener('input',()=>{ recalcTotals(); saveDraft(); });
+['inv-date','client-name','client-address','payment-terms'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', saveDraft);
+});
+
+// ── DRAFT ────────────────────────────────────────────────────────
+function saveDraft(){
+  const rows=[];
+  document.querySelectorAll('.entry-row').forEach(row=>{
+    rows.push({
+      date:  row.querySelector('.r-date').value,
+      start: row.querySelector('.r-start-h').value+':'+row.querySelector('.r-start-m').value,
+      finish:row.querySelector('.r-finish-h').value+':'+row.querySelector('.r-finish-m').value,
+      brk:   row.querySelector('.r-break').value,
+    });
+  });
+  localStorage.setItem(LS.DRAFT, JSON.stringify({
+    invDate:document.getElementById('inv-date').value,
+    clientName:document.getElementById('client-name').value,
+    clientAddress:document.getElementById('client-address').value,
+    paymentTerms:document.getElementById('payment-terms').value,
+    dayRate:document.getElementById('day-rate').value,
+    dayHours:document.getElementById('day-hours').value,
+    stdStart:getStdStart(), stdFinish:getStdFinish(),
+    stdBreak:document.getElementById('std-break').value,
+    rows,
+  }));
+}
+
+function restoreDraft(){
+  try{
+    const d=JSON.parse(localStorage.getItem(LS.DRAFT)||'null');
+    if(!d){ addRow(); return; }
+    if(d.invDate)       document.getElementById('inv-date').value=d.invDate;
+    if(d.clientName)    document.getElementById('client-name').value=d.clientName;
+    if(d.clientAddress) document.getElementById('client-address').value=d.clientAddress;
+    if(d.paymentTerms)  document.getElementById('payment-terms').value=d.paymentTerms;
+    if(d.dayRate)       document.getElementById('day-rate').value=d.dayRate;
+    if(d.dayHours)      document.getElementById('day-hours').value=d.dayHours;
+    if(d.stdStart){
+      const[h,m]=d.stdStart.split(':');
+      document.getElementById('std-start-h').value=h;
+      document.getElementById('std-start-m').value=m;
+    }
+    if(d.stdFinish){
+      const[h,m]=d.stdFinish.split(':');
+      document.getElementById('std-finish-h').value=h;
+      document.getElementById('std-finish-m').value=m;
+    }
+    if(d.stdBreak) document.getElementById('std-break').value=d.stdBreak;
+    updateStdPreview();
+    if(d.rows&&d.rows.length){ d.rows.forEach(r=>addRow(r)); }
+    else { addRow(); }
+  }catch(e){ addRow(); }
+}
+
+// ── CLEAR ────────────────────────────────────────────────────────
+document.getElementById('clear-btn').addEventListener('click',()=>{
+  if(!confirm('Clear all entries and reset the form?')) return;
+  document.getElementById('entries-body').innerHTML='';
+  document.getElementById('client-name').value='';
+  document.getElementById('client-address').value='';
+  document.getElementById('inv-date').value=today();
+  addRow(); recalcTotals(); saveDraft();
+});
+
+// ── BUILD INVOICE HTML ───────────────────────────────────────────
+function buildInvoiceHTML(invNum){
+  const settings=loadSettings();
+  const myName    = settings.name    || 'Peter Devane';
+  const myAddress = settings.address || '43 Audley Street\nAshton-under-Lyne\nLancashire\nOL6 6RB';
+  const vatReg    = settings.vatReg  || false;
+  const vatNum    = settings.vatNum  || '';
+  const bankName  = settings.bankName|| '';
+  const bankBank  = settings.bankBank|| '';
+  const bankSort  = settings.bankSort|| '';
+  const bankAcc   = settings.bankAcc || '';
+  const hasBankDetails = bankName||bankSort||bankAcc;
+
+  const clientName=document.getElementById('client-name').value.trim();
+  const clientAddr=document.getElementById('client-address').value.trim();
+  const invDate   =document.getElementById('inv-date').value;
+  const dayRate   =parseFloat(document.getElementById('day-rate').value)||0;
+  const dayH      =parseFloat(document.getElementById('day-hours').value)||8;
+  const hourRate  =dayH>0?dayRate/dayH:0;
+  const termsVal  =document.getElementById('payment-terms').value;
+  const termsMap  ={immediate:'Payment Due Immediately','7':'Payment Due Within 7 Days','14':'Payment Due Within 14 Days','30':'Payment Due Within 30 Days'};
+  const termsText =termsMap[termsVal]||'Payment Due Within 30 Days';
+
+  const rows=[]; let grandTotal=0;
+  document.querySelectorAll('.entry-row').forEach(row=>{
+    const dateVal=row.querySelector('.r-date').value;
+    const sh=row.querySelector('.r-start-h').value; const sm=row.querySelector('.r-start-m').value;
+    const fh=row.querySelector('.r-finish-h').value; const fm=row.querySelector('.r-finish-m').value;
+    const brkMins=parseInt(row.querySelector('.r-break').value)||0;
+    if(!dateVal) return;
+    const mins=(parseInt(fh)*60+parseInt(fm))-(parseInt(sh)*60+parseInt(sm))-brkMins;
+    if(mins<=0) return;
+    const hrs=mins/60; const amt=hrs*hourRate;
+    grandTotal+=amt;
+    rows.push({dateVal,start:`${sh}:${sm}`,finish:`${fh}:${fm}`,brkMins,hrs,amt});
+  });
+
+  const totalHours=rows.reduce((a,r)=>a+r.hrs,0);
+  const totalDays=dayH>0?totalHours/dayH:0;
+  const addrLines=myAddress.split('\n').filter(Boolean).join('<br>');
+  const clientAddrLines=clientAddr.split('\n').filter(Boolean).join('<br>');
+
+  const lineRows=rows.map(r=>{
+    const brk=r.brkMins>=60?'1 hour':r.brkMins>0?r.brkMins+' min':'—';
+    return `<tr>
+      <td>${fmtDate(r.dateVal)}</td>
+      <td>${r.start} – ${r.finish}</td>
+      <td style="text-align:center">${brk}</td>
+      <td style="text-align:right;font-family:var(--mono)">${r.hrs.toFixed(2)}</td>
+      <td style="text-align:right;font-family:var(--mono)">£${hourRate.toFixed(2)}</td>
+      <td style="text-align:right;font-family:var(--mono)">£${r.amt.toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+
+  const bankBlock = hasBankDetails ? `
+    <br><strong>Payment to:</strong><br>
+    ${esc(bankName)}${bankBank?` · ${esc(bankBank)}`:''}${bankSort?`<br>Sort: ${esc(bankSort)}`:''}${bankAcc?` &nbsp;Acc: ${esc(bankAcc)}`:''}` : '';
+
+  const vatBlock = vatReg ? `<br><strong>VAT Reg:</strong> ${esc(vatNum)}` : '';
+
+  return `
+    <div class="inv-top">
+      <div class="inv-from">
+        <h2>${esc(myName)}</h2>
+        <address>${addrLines}${vatBlock}</address>
+      </div>
+      <div class="inv-badge">
+        <span class="inv-label">INVOICE</span>
+        <span class="inv-num">${fmtNum(invNum)}</span>
+        <span class="inv-date">Date: ${fmtDate(invDate)}</span>
+      </div>
+    </div>
+    <div class="inv-to-section">
+      <div class="inv-to-block">
+        <h4>Invoice To</h4>
+        <p><strong>${esc(clientName)}</strong>${clientAddrLines?'<br>'+clientAddrLines:''}</p>
+      </div>
+      <div class="inv-to-block">
+        <h4>Payment Details</h4>
+        <p>
+          <strong>Day Rate:</strong> £${dayRate.toFixed(2)}<br>
+          <strong>Hourly Rate:</strong> £${hourRate.toFixed(2)}<br>
+          <strong>Terms:</strong> ${termsText}
+          ${bankBlock}
+        </p>
+      </div>
+    </div>
+    <table class="inv-table">
+      <thead><tr>
+        <th>Date</th><th>Hours Worked</th><th style="text-align:center">Break</th>
+        <th style="text-align:right">Hrs Chargeable</th><th style="text-align:right">Rate/hr</th><th style="text-align:right">Amount</th>
+      </tr></thead>
+      <tbody>${lineRows}</tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3" style="text-align:right;color:#6b7a99;font-size:.78rem;">Subtotal</td>
+          <td style="text-align:right;font-family:var(--mono)">${totalHours.toFixed(2)} hrs</td>
+          <td></td>
+          <td style="text-align:right;font-family:var(--mono)">£${grandTotal.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td colspan="3" style="text-align:right;color:#6b7a99;font-size:.78rem;">Total Days</td>
+          <td style="text-align:right;font-family:var(--mono)">${totalDays.toFixed(2)} days</td>
+          <td></td><td></td>
+        </tr>
+        <tr class="total-row">
+          <td colspan="5" style="text-align:right">Total Due</td>
+          <td>£${grandTotal.toFixed(2)}</td>
+        </tr>
+      </tfoot>
+    </table>
+    <div class="inv-footer">
+      <div class="payment-terms">
+        <p><strong>${termsText}</strong></p>
+        <p>Please quote <strong>${fmtNum(invNum)}</strong> on payment</p>
+      </div>
+      <div class="thank-you">Thank you for your business.</div>
+    </div>`;
+}
+
+// ── PRODUCE INVOICE ──────────────────────────────────────────────
+let _currentInvNum = null;
+let _currentInvTotal = 0;
+let _currentClientName = '';
+let _currentTermsText = '';
+let _currentInvHTML = '';
+
+document.getElementById('produce-btn').addEventListener('click',()=>{
+  const clientName=document.getElementById('client-name').value.trim();
+  if(!clientName){ alert('Please enter a client / company name.'); return; }
+  const rows=document.querySelectorAll('.entry-row');
+  let hasData=false;
+  rows.forEach(row=>{
+    const sh=row.querySelector('.r-start-h').value; const sm=row.querySelector('.r-start-m').value;
+    const fh=row.querySelector('.r-finish-h').value; const fm=row.querySelector('.r-finish-m').value;
+    const brkMins=parseInt(row.querySelector('.r-break').value)||0;
+    const mins=(parseInt(fh)*60+parseInt(fm))-(parseInt(sh)*60+parseInt(sm))-brkMins;
+    if(mins>0) hasData=true;
+  });
+  if(!hasData){ alert('No valid time entries to invoice.'); return; }
+
+  _currentInvNum=getNextNum();
+  const html=buildInvoiceHTML(_currentInvNum);
+  _currentInvHTML=html;
+  document.getElementById('invoice-preview').innerHTML=html;
+
+  // Calc total for log
+  const dayRate=parseFloat(document.getElementById('day-rate').value)||0;
+  const dayH=parseFloat(document.getElementById('day-hours').value)||8;
+  const hourRate=dayH>0?dayRate/dayH:0;
+  let gt=0;
+  document.querySelectorAll('.entry-row').forEach(row=>{
+    const sh=row.querySelector('.r-start-h').value; const sm=row.querySelector('.r-start-m').value;
+    const fh=row.querySelector('.r-finish-h').value; const fm=row.querySelector('.r-finish-m').value;
+    const brkMins=parseInt(row.querySelector('.r-break').value)||0;
+    const mins=(parseInt(fh)*60+parseInt(fm))-(parseInt(sh)*60+parseInt(sm))-brkMins;
+    if(mins>0) gt+=(mins/60)*hourRate;
+  });
+  _currentInvTotal=gt;
+  _currentClientName=clientName;
+  const termsVal=document.getElementById('payment-terms').value;
+  const termsMap={immediate:'Payment Due Immediately','7':'Payment Due Within 7 Days','14':'Payment Due Within 14 Days','30':'Payment Due Within 30 Days'};
+  _currentTermsText=termsMap[termsVal]||'Payment Due Within 30 Days';
+
+  document.getElementById('modal-overlay').classList.add('open');
+});
+
+// ── MODAL: PRINT ─────────────────────────────────────────────────
+document.getElementById('modal-print-btn').addEventListener('click',()=>{
+  // Inject current invoice into print container and print
+  const printEl=document.getElementById('invoice-print-content');
+  printEl.innerHTML=`<div id="invoice-preview" style="padding:40px 50px;font-family:sans-serif;color:#1a2540;">${document.getElementById('invoice-preview').innerHTML}</div>`;
+  // Copy styles inline for print
+  const style=document.createElement('style');
+  style.textContent=`
+    @media print{
+      body>*:not(#invoice-print-content){display:none!important;}
+      #invoice-print-content{display:block!important;position:fixed;inset:0;background:white;z-index:9999;padding:0;}
+    }
+    .inv-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:22px;border-bottom:2px solid #1a2540;}
+    .inv-from h2{font-size:1.3rem;font-weight:700;color:#1a2540;margin-bottom:4px;}
+    .inv-from address{font-style:normal;font-size:.8rem;color:#4a5568;line-height:1.7;}
+    .inv-badge{text-align:right;}
+    .inv-badge .inv-label{font-size:1.8rem;font-weight:800;color:#1a2540;display:block;}
+    .inv-badge .inv-num{font-size:.9rem;color:#f0a500;font-weight:600;display:block;margin-top:2px;}
+    .inv-badge .inv-date{font-size:.76rem;color:#6b7a99;display:block;margin-top:4px;}
+    .inv-to-section{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:28px;}
+    .inv-to-block h4{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#6b7a99;margin-bottom:6px;}
+    .inv-to-block p{font-size:.81rem;color:#1a2540;line-height:1.7;}
+    .inv-table{width:100%;border-collapse:collapse;margin-bottom:20px;font-size:.79rem;}
+    .inv-table thead tr{background:#1a2540;color:white;}
+    .inv-table thead th{padding:8px 11px;text-align:left;font-size:.66rem;font-weight:600;text-transform:uppercase;}
+    .inv-table tbody tr{border-bottom:1px solid #dde3f0;}
+    .inv-table tbody tr:nth-child(even){background:#f9fafc;}
+    .inv-table tbody td{padding:8px 11px;font-size:.79rem;}
+    .inv-table tfoot td{padding:6px 11px;font-size:.79rem;}
+    .inv-table tfoot .total-row td{border-top:2px solid #1a2540;font-weight:700;font-size:.9rem;padding-top:8px;}
+    .inv-footer{margin-top:24px;padding-top:16px;border-top:1px solid #dde3f0;display:flex;justify-content:space-between;align-items:flex-end;font-size:.71rem;color:#6b7a99;}
+    .inv-footer .payment-terms p{margin-bottom:3px;}
+    .inv-footer .payment-terms strong{color:#1a2540;}
+    .inv-footer .thank-you{font-size:.81rem;font-weight:600;color:#1a2540;}
+    @page{margin:12mm;size:A4;}
+  `;
+  printEl.appendChild(style);
+  window.print();
+  // Clean up after print dialog closes
+  setTimeout(()=>{ printEl.innerHTML=''; }, 2000);
+});
+
+// ── MODAL: CONFIRM & LOG ─────────────────────────────────────────
+document.getElementById('modal-confirm-btn').addEventListener('click',()=>{
+  // Save to log
+  // Collect raw row data for later editing
+  const rawRows=[];
+  document.querySelectorAll('.entry-row').forEach(row=>{
+    const sh=row.querySelector('.r-start-h').value, sm=row.querySelector('.r-start-m').value;
+    const fh=row.querySelector('.r-finish-h').value, fm=row.querySelector('.r-finish-m').value;
+    rawRows.push({
+      date:  row.querySelector('.r-date').value,
+      start: sh+':'+sm, finish: fh+':'+fm,
+      brk:   row.querySelector('.r-break').value,
+    });
+  });
+  const logEntry={
+    id:       _currentInvNum,
+    num:      fmtNum(_currentInvNum),
+    date:     document.getElementById('inv-date').value,
+    client:   _currentClientName,
+    clientAddress: document.getElementById('client-address').value,
+    amount:   _currentInvTotal,
+    terms:    document.getElementById('payment-terms').value,
+    termsText:_currentTermsText,
+    dayRate:  document.getElementById('day-rate').value,
+    dayHours: document.getElementById('day-hours').value,
+    rows:     rawRows,
+    paid:     false,
+    created:  new Date().toISOString(),
+    html:     _currentInvHTML,
+  };
+  const log=getLog();
+  log.unshift(logEntry);
+  localStorage.setItem(LS.LOG, JSON.stringify(log));
+
+  bumpNum(); updateNumDisplay();
+  document.getElementById('modal-overlay').classList.remove('open');
+
+  // Clear form
+  document.getElementById('entries-body').innerHTML='';
+  document.getElementById('client-name').value='';
+  document.getElementById('client-address').value='';
+  document.getElementById('inv-date').value=today();
+  addRow(); recalcTotals(); saveDraft();
+
+  alert(`Invoice ${fmtNum(_currentInvNum)} logged. Next invoice will be ${fmtNum(getNextNum())}.`);
+});
+
+document.getElementById('modal-close-btn').addEventListener('click',()=>{
+  document.getElementById('modal-overlay').classList.remove('open');
+});
+document.getElementById('modal-overlay').addEventListener('click',function(e){
+  if(e.target===this) this.classList.remove('open');
+});
+
+// ── LOG ──────────────────────────────────────────────────────────
+function getLog(){
+  try{ return JSON.parse(localStorage.getItem(LS.LOG)||'[]'); }catch(e){ return []; }
+}
+
+function renderLog(){
+  const log=getLog();
+  const body=document.getElementById('log-body');
+
+  // Stats
+  const total=log.reduce((a,e)=>a+e.amount,0);
+  const paid=log.filter(e=>e.paid).reduce((a,e)=>a+e.amount,0);
+  const outstanding=total-paid;
+  document.getElementById('log-total').textContent='£'+total.toFixed(2);
+  document.getElementById('log-paid').textContent='£'+paid.toFixed(2);
+  document.getElementById('log-outstanding').textContent='£'+outstanding.toFixed(2);
+
+  if(!log.length){
+    body.innerHTML=`<div class="log-empty">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>
+      No invoices logged yet. Confirm an invoice to add it here.</div>`;
+    return;
+  }
+
+  body.innerHTML=`
+    <table class="log-table">
+      <thead><tr>
+        <th>Inv #</th><th>Date</th><th>Client</th><th>Amount</th><th>Terms</th><th>Status</th><th>View</th><th>Edit</th><th></th>
+      </tr></thead>
+      <tbody id="log-rows"></tbody>
+    </table>`;
+
+  const tbody=document.getElementById('log-rows');
+  log.forEach((entry,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td class="mono" style="font-weight:600;color:var(--amber)">${esc(entry.num)}</td>
+      <td>${fmtDate(entry.date)}</td>
+      <td>${esc(entry.client)}</td>
+      <td class="mono">£${entry.amount.toFixed(2)}</td>
+      <td style="font-size:.78rem;color:var(--text-soft)">${esc(entry.terms)}</td>
+      <td>
+        <button class="paid-toggle ${entry.paid?'paid':'unpaid'}" data-idx="${i}">
+          <span class="dot"></span>${entry.paid?'Paid':'Unpaid'}
+        </button>
+      </td>
+      <td>
+        ${entry.html ? `<button class="btn-view-log" data-idx="${i}" title="View &amp; Print Invoice">🖨</button>` : '<span style="color:var(--slate-light);font-size:.75rem;">—</span>'}
+      </td>
+      <td>
+        ${entry.rows ? `<button class="btn-edit-log" data-idx="${i}" title="Edit Invoice">✏️</button>` : '<span style="color:var(--slate-light);font-size:.75rem;">—</span>'}
+      </td>
+      <td><button class="btn-del-log" data-idx="${i}" title="Delete">🗑</button></td>`;
+    tbody.appendChild(tr);
+  });
+
+  // Paid toggle events
+  tbody.querySelectorAll('.paid-toggle').forEach(btn=>{
+    btn.addEventListener('click',function(){
+      const idx=parseInt(this.dataset.idx);
+      const log=getLog();
+      log[idx].paid=!log[idx].paid;
+      localStorage.setItem(LS.LOG,JSON.stringify(log));
+      renderLog();
+    });
+  });
+
+  // Delete events
+  tbody.querySelectorAll('.btn-del-log').forEach(btn=>{
+    btn.addEventListener('click',function(){
+      const idx=parseInt(this.dataset.idx);
+      const log=getLog();
+      if(!confirm(`Delete invoice ${log[idx].num}?`)) return;
+      log.splice(idx,1);
+      localStorage.setItem(LS.LOG,JSON.stringify(log));
+      renderLog();
+    });
+  });
+
+  // View/print events
+  tbody.querySelectorAll('.btn-view-log').forEach(btn=>{
+    btn.addEventListener('click',function(){
+      const idx=parseInt(this.dataset.idx);
+      const log=getLog();
+      const entry=log[idx];
+      if(!entry||!entry.html){ alert('No saved invoice HTML for this entry.'); return; }
+      document.getElementById('log-invoice-preview').innerHTML=entry.html;
+      document.getElementById('log-modal-overlay').classList.add('open');
+    });
+  });
+
+  // Edit events
+  tbody.querySelectorAll('.btn-edit-log').forEach(btn=>{
+    btn.addEventListener('click',function(){
+      const idx=parseInt(this.dataset.idx);
+      openEditModal(idx);
+    });
+  });
+}
+
+// ── LOG MODAL CONTROLS ───────────────────────────────────────────
+document.getElementById('log-modal-close-btn').addEventListener('click',()=>{
+  document.getElementById('log-modal-overlay').classList.remove('open');
+});
+document.getElementById('log-modal-overlay').addEventListener('click',function(e){
+  if(e.target===this) this.classList.remove('open');
+});
+document.getElementById('log-modal-print-btn').addEventListener('click',()=>{
+  const printEl=document.getElementById('invoice-print-content');
+  printEl.innerHTML=`<div id="invoice-preview" style="padding:40px 50px;font-family:sans-serif;color:#1a2540;">${document.getElementById('log-invoice-preview').innerHTML}</div>`;
+  const style=document.createElement('style');
+  style.textContent=`
+    @media print{
+      body>*:not(#invoice-print-content){display:none!important;}
+      #invoice-print-content{display:block!important;position:fixed;inset:0;background:white;z-index:9999;padding:0;}
+    }
+    .inv-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:22px;border-bottom:2px solid #1a2540;}
+    .inv-from h2{font-size:1.3rem;font-weight:700;color:#1a2540;margin-bottom:4px;}
+    .inv-from address{font-style:normal;font-size:.8rem;color:#4a5568;line-height:1.7;}
+    .inv-badge{text-align:right;}
+    .inv-badge .inv-label{font-size:1.8rem;font-weight:800;color:#1a2540;display:block;}
+    .inv-badge .inv-num{font-size:.9rem;color:#f0a500;font-weight:600;display:block;margin-top:2px;}
+    .inv-badge .inv-date{font-size:.76rem;color:#6b7a99;display:block;margin-top:4px;}
+    .inv-to-section{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:28px;}
+    .inv-to-block h4{font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#6b7a99;margin-bottom:6px;}
+    .inv-to-block p{font-size:.81rem;color:#1a2540;line-height:1.7;}
+    .inv-table{width:100%;border-collapse:collapse;margin-bottom:20px;font-size:.79rem;}
+    .inv-table thead tr{background:#1a2540;color:white;}
+    .inv-table thead th{padding:8px 11px;text-align:left;font-size:.66rem;font-weight:600;text-transform:uppercase;}
+    .inv-table tbody tr{border-bottom:1px solid #dde3f0;}
+    .inv-table tbody tr:nth-child(even){background:#f9fafc;}
+    .inv-table tbody td{padding:8px 11px;font-size:.79rem;}
+    .inv-table tfoot td{padding:6px 11px;font-size:.79rem;}
+    .inv-table tfoot .total-row td{border-top:2px solid #1a2540;font-weight:700;font-size:.9rem;padding-top:8px;}
+    .inv-footer{margin-top:24px;padding-top:16px;border-top:1px solid #dde3f0;display:flex;justify-content:space-between;align-items:flex-end;font-size:.71rem;color:#6b7a99;}
+    .inv-footer .payment-terms p{margin-bottom:3px;}
+    .inv-footer .payment-terms strong{color:#1a2540;}
+    .inv-footer .thank-you{font-size:.81rem;font-weight:600;color:#1a2540;}
+    @page{margin:12mm;size:A4;}
+  `;
+  printEl.appendChild(style);
+  window.print();
+  setTimeout(()=>{ printEl.innerHTML=''; }, 2000);
+});
+
+// ── INIT ─────────────────────────────────────────────────────────
+document.getElementById('inv-date').value=today();
+populateSettingsForm();
+updateNumDisplay();
+restoreDraft();
+
+})();
+
+
+// ── EDIT MODAL ───────────────────────────────────────────────────
+let _editIdx = null;
+let editRowId = 0;
+
+function openEditModal(idx) {
+  const log = getLog();
+  const entry = log[idx];
+  if (!entry) return;
+  _editIdx = idx;
+
+  // Populate fields
+  document.getElementById('edit-inv-num').textContent = entry.num;
+  document.getElementById('edit-inv-date').value = entry.date || '';
+  document.getElementById('edit-client-name').value = entry.client || '';
+  document.getElementById('edit-client-address').value = entry.clientAddress || '';
+  document.getElementById('edit-payment-terms').value = entry.terms || '30';
+  document.getElementById('edit-day-rate').value = entry.dayRate || '250';
+  document.getElementById('edit-day-hours').value = entry.dayHours || '8';
+
+  // Clear and repopulate rows
+  document.getElementById('edit-entries-body').innerHTML = '';
+  editRowId = 0;
+  if (entry.rows && entry.rows.length) {
+    entry.rows.forEach(r => addEditRow(r));
+  } else {
+    addEditRow();
+  }
+  editRecalc();
+
+  document.getElementById('edit-modal-overlay').classList.add('open');
+}
+
+function addEditRow(data) {
+  editRowId++;
+  const id = editRowId;
+  const body = document.getElementById('edit-entries-body');
+  const row = document.createElement('div');
+  row.className = 'entry-row'; row.dataset.id = id;
+  const s = data?.start || '09:00';
+  const f = data?.finish || '17:00';
+  const [sh, sm] = s.split(':');
+  const [fh, fm] = f.split(':');
+  const brk = data?.brk || '30';
+  row.innerHTML = `
+    <div class="row-ctrl">
+      <button class="btn-move btn-up" title="Move up">▲</button>
+      <span></span>
+      <button class="btn-move btn-dn" title="Move down">▼</button>
+    </div>
+    <input type="date" class="r-date" value="${data?.date || today()}">
+    <div class="time-pair">
+      <select class="r-start-h">${buildHrOpts(sh)}</select>
+      <span class="sep">:</span>
+      <select class="r-start-m">${buildMinOpts(sm)}</select>
+    </div>
+    <div class="time-pair">
+      <select class="r-finish-h">${buildHrOpts(fh)}</select>
+      <span class="sep">:</span>
+      <select class="r-finish-m">${buildMinOpts(fm)}</select>
+    </div>
+    <select class="r-break">
+      <option value="0"  ${brk==='0' ?'selected':''}>00</option>
+      <option value="15" ${brk==='15'?'selected':''}>15</option>
+      <option value="30" ${brk==='30'?'selected':''}>30</option>
+      <option value="45" ${brk==='45'?'selected':''}>45</option>
+      <option value="60" ${brk==='60'?'selected':''}>60</option>
+    </select>
+    <div class="hours-cell" id="edit-hours-${id}">—</div>
+    <button class="btn-remove" title="Remove">×</button>`;
+  body.appendChild(row);
+
+  ['.r-start-h','.r-start-m','.r-finish-h','.r-finish-m','.r-break'].forEach(sel => {
+    row.querySelector(sel).addEventListener('change', () => { editCalcRow(id); editRecalc(); });
+  });
+  row.querySelector('.r-date').addEventListener('change', () => {});
+  row.querySelector('.btn-remove').addEventListener('click', () => { row.remove(); editRecalc(); editUpdateMoveButtons(); });
+  row.querySelector('.btn-up').addEventListener('click', () => editMoveRow(row, 'up'));
+  row.querySelector('.btn-dn').addEventListener('click', () => editMoveRow(row, 'dn'));
+  editCalcRow(id);
+  editUpdateMoveButtons();
+}
+
+function editCalcRow(id) {
+  const row = document.querySelector(`#edit-entries-body .entry-row[data-id="${id}"]`);
+  if (!row) return 0;
+  const sh = row.querySelector('.r-start-h').value, sm = row.querySelector('.r-start-m').value;
+  const fh = row.querySelector('.r-finish-h').value, fm = row.querySelector('.r-finish-m').value;
+  const brk = parseInt(row.querySelector('.r-break').value) || 0;
+  const cell = document.getElementById('edit-hours-' + id);
+  const mins = (parseInt(fh)*60+parseInt(fm)) - (parseInt(sh)*60+parseInt(sm)) - brk;
+  if (mins <= 0) { if(cell){cell.textContent='0.00 h';cell.className='hours-cell zero';} return 0; }
+  const hrs = mins / 60;
+  if (cell) { cell.textContent = hrs.toFixed(2)+' h'; cell.className='hours-cell'; }
+  return hrs;
+}
+
+function editRecalc() {
+  let totalH = 0;
+  document.querySelectorAll('#edit-entries-body .entry-row').forEach(row => {
+    totalH += editCalcRow(parseInt(row.dataset.id));
+  });
+  const dayH = parseFloat(document.getElementById('edit-day-hours').value) || 8;
+  const dayRate = parseFloat(document.getElementById('edit-day-rate').value) || 0;
+  const hourRate = dayH > 0 ? dayRate / dayH : 0;
+  document.getElementById('edit-total-hours').textContent = totalH.toFixed(2);
+  document.getElementById('edit-total-amount').textContent = '£' + (totalH * hourRate).toFixed(2);
+}
+
+function editMoveRow(row, dir) {
+  const body = document.getElementById('edit-entries-body');
+  if (dir === 'up') { const prev = row.previousElementSibling; if (prev) body.insertBefore(row, prev); }
+  else { const next = row.nextElementSibling; if (next) body.insertBefore(next, row); }
+  editUpdateMoveButtons();
+}
+
+function editUpdateMoveButtons() {
+  const rows = document.querySelectorAll('#edit-entries-body .entry-row');
+  rows.forEach((row, i) => {
+    const up = row.querySelector('.btn-up');
+    const dn = row.querySelector('.btn-dn');
+    if (up) up.disabled = (i === 0);
+    if (dn) dn.disabled = (i === rows.length - 1);
+  });
+}
+
+document.getElementById('edit-add-row-btn').addEventListener('click', () => addEditRow());
+document.getElementById('edit-day-rate').addEventListener('input', editRecalc);
+document.getElementById('edit-day-hours').addEventListener('input', editRecalc);
+
+// Preview from edit modal
+document.getElementById('edit-preview-btn').addEventListener('click', () => {
+  const previewHTML = buildEditInvoiceHTML();
+  if (!previewHTML) return;
+  document.getElementById('log-invoice-preview').innerHTML = previewHTML;
+  document.getElementById('log-modal-overlay').classList.add('open');
+});
+
+// Save changes
+document.getElementById('edit-save-btn').addEventListener('click', () => {
+  if (_editIdx === null) return;
+  const log = getLog();
+  const entry = log[_editIdx];
+
+  // Collect updated raw rows
+  const rawRows = [];
+  let grandTotal = 0;
+  const dayRate = parseFloat(document.getElementById('edit-day-rate').value) || 0;
+  const dayH = parseFloat(document.getElementById('edit-day-hours').value) || 8;
+  const hourRate = dayH > 0 ? dayRate / dayH : 0;
+
+  document.querySelectorAll('#edit-entries-body .entry-row').forEach(row => {
+    const sh = row.querySelector('.r-start-h').value, sm = row.querySelector('.r-start-m').value;
+    const fh = row.querySelector('.r-finish-h').value, fm = row.querySelector('.r-finish-m').value;
+    const brk = parseInt(row.querySelector('.r-break').value) || 0;
+    const mins = (parseInt(fh)*60+parseInt(fm)) - (parseInt(sh)*60+parseInt(sm)) - brk;
+    const hrs = mins > 0 ? mins / 60 : 0;
+    grandTotal += hrs * hourRate;
+    rawRows.push({
+      date: row.querySelector('.r-date').value,
+      start: sh+':'+sm, finish: fh+':'+fm,
+      brk: row.querySelector('.r-break').value,
+    });
+  });
+
+  const termsVal = document.getElementById('edit-payment-terms').value;
+  const termsMap = {immediate:'Payment Due Immediately','7':'Payment Due Within 7 Days','14':'Payment Due Within 14 Days','30':'Payment Due Within 30 Days'};
+
+  // Update entry
+  entry.date          = document.getElementById('edit-inv-date').value;
+  entry.client        = document.getElementById('edit-client-name').value.trim();
+  entry.clientAddress = document.getElementById('edit-client-address').value.trim();
+  entry.terms         = termsVal;
+  entry.termsText     = termsMap[termsVal] || '';
+  entry.dayRate       = document.getElementById('edit-day-rate').value;
+  entry.dayHours      = document.getElementById('edit-day-hours').value;
+  entry.rows          = rawRows;
+  entry.amount        = grandTotal;
+  entry.html          = buildEditInvoiceHTML();
+
+  localStorage.setItem(LS.LOG, JSON.stringify(log));
+  document.getElementById('edit-modal-overlay').classList.remove('open');
+  renderLog();
+  alert(`Invoice ${entry.num} updated.`);
+});
+
+// Build invoice HTML from the edit modal fields (mirrors buildInvoiceHTML but reads edit fields)
+function buildEditInvoiceHTML() {
+  const settings = loadSettings();
+  const myName    = settings.name    || 'Peter Devane';
+  const myAddress = settings.address || '43 Audley Street\nAshton-under-Lyne\nLancashire\nOL6 6RB';
+  const vatReg    = settings.vatReg  || false;
+  const vatNum    = settings.vatNum  || '';
+  const bankName  = settings.bankName|| '';
+  const bankBank  = settings.bankBank|| '';
+  const bankSort  = settings.bankSort|| '';
+  const bankAcc   = settings.bankAcc || '';
+  const hasBankDetails = bankName||bankSort||bankAcc;
+
+  const log = getLog();
+  const entry = _editIdx !== null ? log[_editIdx] : null;
+  const invNum = entry ? entry.id : 0;
+
+  const clientName    = document.getElementById('edit-client-name').value.trim();
+  const clientAddr    = document.getElementById('edit-client-address').value.trim();
+  const invDate       = document.getElementById('edit-inv-date').value;
+  const dayRate       = parseFloat(document.getElementById('edit-day-rate').value) || 0;
+  const dayH          = parseFloat(document.getElementById('edit-day-hours').value) || 8;
+  const hourRate      = dayH > 0 ? dayRate / dayH : 0;
+  const termsVal      = document.getElementById('edit-payment-terms').value;
+  const termsMap      = {immediate:'Payment Due Immediately','7':'Payment Due Within 7 Days','14':'Payment Due Within 14 Days','30':'Payment Due Within 30 Days'};
+  const termsText     = termsMap[termsVal] || 'Payment Due Within 30 Days';
+
+  const rows = []; let grandTotal = 0;
+  document.querySelectorAll('#edit-entries-body .entry-row').forEach(row => {
+    const dateVal = row.querySelector('.r-date').value;
+    const sh = row.querySelector('.r-start-h').value, sm = row.querySelector('.r-start-m').value;
+    const fh = row.querySelector('.r-finish-h').value, fm = row.querySelector('.r-finish-m').value;
+    const brkMins = parseInt(row.querySelector('.r-break').value) || 0;
+    if (!dateVal) return;
+    const mins = (parseInt(fh)*60+parseInt(fm)) - (parseInt(sh)*60+parseInt(sm)) - brkMins;
+    if (mins <= 0) return;
+    const hrs = mins / 60; const amt = hrs * hourRate;
+    grandTotal += amt;
+    rows.push({ dateVal, start:`${sh}:${sm}`, finish:`${fh}:${fm}`, brkMins, hrs, amt });
+  });
+
+  if (!rows.length) { alert('No valid time entries.'); return null; }
+
+  const totalHours = rows.reduce((a,r) => a+r.hrs, 0);
+  const totalDays  = dayH > 0 ? totalHours / dayH : 0;
+  const addrLines  = myAddress.split('\n').filter(Boolean).join('<br>');
+  const clientAddrLines = clientAddr.split('\n').filter(Boolean).join('<br>');
+  const vatBlock   = vatReg ? `<br><strong>VAT Reg:</strong> ${esc(vatNum)}` : '';
+  const bankBlock  = hasBankDetails ? `<br><strong>Payment to:</strong><br>${esc(bankName)}${bankBank?` · ${esc(bankBank)}`:''}${bankSort?`<br>Sort: ${esc(bankSort)}`:''}${bankAcc?` &nbsp;Acc: ${esc(bankAcc)}`:''}` : '';
+
+  const lineRows = rows.map(r => {
+    const brk = r.brkMins >= 60 ? '1 hour' : r.brkMins > 0 ? r.brkMins + ' min' : '—';
+    return `<tr>
+      <td>${fmtDate(r.dateVal)}</td>
+      <td>${r.start} – ${r.finish}</td>
+      <td style="text-align:center">${brk}</td>
+      <td style="text-align:right;font-family:var(--mono)">${r.hrs.toFixed(2)}</td>
+      <td style="text-align:right;font-family:var(--mono)">£${hourRate.toFixed(2)}</td>
+      <td style="text-align:right;font-family:var(--mono)">£${r.amt.toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+
+  return `
+    <div class="inv-top">
+      <div class="inv-from"><h2>${esc(myName)}</h2><address>${addrLines}${vatBlock}</address></div>
+      <div class="inv-badge">
+        <span class="inv-label">INVOICE</span>
+        <span class="inv-num">${fmtNum(invNum)}</span>
+        <span class="inv-date">Date: ${fmtDate(invDate)}</span>
+      </div>
+    </div>
+    <div class="inv-to-section">
+      <div class="inv-to-block"><h4>Invoice To</h4><p><strong>${esc(clientName)}</strong>${clientAddrLines?'<br>'+clientAddrLines:''}</p></div>
+      <div class="inv-to-block"><h4>Payment Details</h4><p>
+        <strong>Day Rate:</strong> £${dayRate.toFixed(2)}<br>
+        <strong>Hourly Rate:</strong> £${hourRate.toFixed(2)}<br>
+        <strong>Terms:</strong> ${termsText}${bankBlock}
+      </p></div>
+    </div>
+    <table class="inv-table">
+      <thead><tr>
+        <th>Date</th><th>Hours Worked</th><th style="text-align:center">Break</th>
+        <th style="text-align:right">Hrs Chargeable</th><th style="text-align:right">Rate/hr</th><th style="text-align:right">Amount</th>
+      </tr></thead>
+      <tbody>${lineRows}</tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3" style="text-align:right;color:#6b7a99;font-size:.78rem;">Subtotal</td>
+          <td style="text-align:right;font-family:var(--mono)">${totalHours.toFixed(2)} hrs</td>
+          <td></td>
+          <td style="text-align:right;font-family:var(--mono)">£${grandTotal.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td colspan="3" style="text-align:right;color:#6b7a99;font-size:.78rem;">Total Days</td>
+          <td style="text-align:right;font-family:var(--mono)">${totalDays.toFixed(2)} days</td>
+          <td></td><td></td>
+        </tr>
+        <tr class="total-row">
+          <td colspan="5" style="text-align:right">Total Due</td>
+          <td>£${grandTotal.toFixed(2)}</td>
+        </tr>
+      </tfoot>
+    </table>
+    <div class="inv-footer">
+      <div class="payment-terms">
+        <p><strong>${termsText}</strong></p>
+        <p>Please quote <strong>${fmtNum(invNum)}</strong> on payment</p>
+      </div>
+      <div class="thank-you">Thank you for your business.</div>
+    </div>`;
+}
+
+// Close buttons
+document.getElementById('edit-modal-close-btn').addEventListener('click', () => {
+  document.getElementById('edit-modal-overlay').classList.remove('open');
+});
+document.getElementById('edit-modal-close-btn2').addEventListener('click', () => {
+  document.getElementById('edit-modal-overlay').classList.remove('open');
+});
+document.getElementById('edit-modal-overlay').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+
+</script>
+
+<!-- ── LOG VIEW MODAL ── -->
+<div class="modal-overlay" id="log-modal-overlay">
+  <div class="modal">
+    <div id="log-invoice-preview"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="log-modal-close-btn">← Close</button>
+      <button class="btn-primary" id="log-modal-print-btn">🖨 Save as PDF</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── EDIT INVOICE MODAL ── -->
+<div class="modal-overlay" id="edit-modal-overlay">
+  <div class="modal" style="max-width:900px;">
+    <div style="padding:24px 28px 0; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; margin-bottom:0;">
+      <h2 style="font-size:1.05rem; font-weight:700; color:var(--navy);">✏️ Edit Invoice <span id="edit-inv-num" style="color:var(--amber);"></span></h2>
+      <button class="btn-secondary" id="edit-modal-close-btn" style="padding:7px 14px; font-size:.8rem;">✕ Close</button>
+    </div>
+    <div style="padding:20px 28px; overflow-y:auto; max-height:75vh;">
+
+      <!-- Meta row -->
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px; margin-bottom:18px;" class="edit-meta-grid">
+        <div class="meta-field"><label>Invoice Date</label><input type="date" id="edit-inv-date"></div>
+        <div class="meta-field"><label>Client / Company</label><input type="text" id="edit-client-name"></div>
+        <div class="meta-field"><label>Client Address</label><textarea id="edit-client-address" style="min-height:62px;"></textarea></div>
+        <div class="meta-field"><label>Payment Terms</label>
+          <select id="edit-payment-terms">
+            <option value="immediate">Payment Due Immediately</option>
+            <option value="7">Payment Due Within 7 Days</option>
+            <option value="14">Payment Due Within 14 Days</option>
+            <option value="30">Payment Due Within 30 Days</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Rate row -->
+      <div style="display:flex; gap:24px; margin-bottom:18px; flex-wrap:wrap;">
+        <div class="rate-field"><label>Day Rate (£)</label><input type="number" id="edit-day-rate" min="0" step="0.01" style="width:100px;"></div>
+        <div class="rate-field"><label>Working Day (hrs)</label><input type="number" id="edit-day-hours" min="1" max="24" step="0.5" style="width:80px;"></div>
+      </div>
+
+      <!-- Entries -->
+      <p class="section-title" style="margin-bottom:10px;">Time Entries</p>
+      <div class="entries-panel" id="edit-entries-panel" style="margin-bottom:16px;">
+        <div class="entries-header" id="edit-entries-header">
+          <span></span><span>Date</span><span>Start</span><span>Finish</span><span>Break (min)</span><span style="text-align:right">Hours</span><span></span>
+        </div>
+        <div id="edit-entries-body"></div>
+        <button class="add-row-btn" id="edit-add-row-btn">
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Add Day
+        </button>
+      </div>
+
+      <!-- Totals -->
+      <div class="totals-bar" style="margin-bottom:0;">
+        <div class="total-item"><span>Total Hours</span><strong id="edit-total-hours">0.00</strong></div>
+        <div class="total-divider"></div>
+        <div class="total-item hl"><span>Invoice Total</span><strong id="edit-total-amount">£0.00</strong></div>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" id="edit-modal-close-btn2">← Cancel</button>
+      <button class="btn-secondary" id="edit-preview-btn">👁 Preview</button>
+      <button class="btn-primary" id="edit-save-btn">✓ Save Changes</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
