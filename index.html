@@ -334,10 +334,23 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
   .btn-edit-log:hover { background:#f0fff4; border-color:var(--green); }
   .btn-view-log { background:none; border:1.5px solid var(--border); border-radius:6px; padding:4px 9px; font-size:.85rem; cursor:pointer; transition:background .15s,border-color .15s; }
   .btn-view-log:hover { background:#f0f4ff; border-color:var(--navy-light); }
+
+  /* ── TOAST ── */
+  #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--navy);color:white;padding:10px 22px;border-radius:24px;font-size:.82rem;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.2);z-index:9999;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
+  #toast.hidden{opacity:0;}
+  #toast.success{background:#1a8a5a;}
+  #toast.error{background:var(--red);}
+  #toast.info{background:var(--navy-light);}
+  /* ── LOADING OVERLAY ── */
+  #db-status{position:fixed;top:0;left:0;right:0;height:3px;background:var(--amber);transform:scaleX(0);transform-origin:left;transition:transform .4s;z-index:10000;}
+  #db-status.loading{animation:loadbar 1.5s ease-in-out infinite;}
+  @keyframes loadbar{0%{transform:scaleX(0);transform-origin:left}50%{transform:scaleX(.7);transform-origin:left}50.1%{transform:scaleX(.7);transform-origin:right}100%{transform:scaleX(0);transform-origin:right}}
 </style>
 </head>
 <body>
 
+<div id="db-status"></div>
+<div id="toast" class="hidden"></div>
 <header class="app-header">
   <div class="app-header-top">
     <div class="brand">
@@ -347,6 +360,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
     <div class="inv-counter">
       <span>Next Invoice</span>
       <strong id="next-inv-display">#001</strong>
+      <div id="draft-status" style="font-size:.65rem;color:var(--slate-light);margin-top:3px;text-align:right;"></div>
     </div>
   </div>
   <div class="tab-bar">
@@ -470,6 +484,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 
     <div class="actions">
       <button class="btn-secondary" id="clear-btn">Clear All</button>
+      <button class="btn-secondary" id="save-draft-btn">💾 Save Draft</button>
       <button class="btn-primary" id="produce-btn">Produce Invoice →</button>
     </div>
   </div>
@@ -548,12 +563,52 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 <script>
 (function(){
 'use strict';
-const LS = {
-  INV_NUM:  'pd_inv_num',
-  DRAFT:    'pd_inv_draft',
-  LOG:      'pd_inv_log',
-  SETTINGS: 'pd_inv_settings',
+// ── SUPABASE ─────────────────────────────────────────────────────
+const SB_URL = 'https://zsrqzsjdjfgciskeeyaf.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzcnF6c2pkamZnY2lza2VleWFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4NzM2MjcsImV4cCI6MjA5NzQ0OTYyN30.9Hwbd-ofGLI5xROssz8YQFAdOmGP7cY3XeNBPdjyH-Y';
+const SB_HEADERS = {
+  'Content-Type': 'application/json',
+  'apikey': SB_KEY,
+  'Authorization': 'Bearer ' + SB_KEY,
+  'Prefer': 'return=representation',
 };
+async function sbGet(table, filters=''){
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?${filters}`, {headers:SB_HEADERS});
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function sbPost(table, body){
+  const r = await fetch(`${SB_URL}/rest/v1/${table}`, {method:'POST',headers:SB_HEADERS,body:JSON.stringify(body)});
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function sbPatch(table, id, body){
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`, {method:'PATCH',headers:SB_HEADERS,body:JSON.stringify(body)});
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function sbDelete(table, id){
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`, {method:'DELETE',headers:SB_HEADERS});
+  if(!r.ok) throw new Error(await r.text());
+  return true;
+}
+
+function showToast(msg, type='info'){
+  const t=document.getElementById('toast');
+  const bar=document.getElementById('db-status');
+  if(!msg || type==='clear'){ t.classList.add('hidden'); bar.classList.remove('loading'); return; }
+  t.textContent=msg;
+  t.className=type;
+  bar.className = (type==='info') ? 'loading' : '';
+  if(type==='success'){ setTimeout(()=>{ t.classList.add('hidden'); },3000); }
+}
+
+
+// Draft still uses localStorage (fast, no async needed)
+const LS_DRAFT = 'pd_inv_draft';
+
+// In-memory log cache
+let _logCache = null;
 
 // ── HELPERS ──────────────────────────────────────────────────────
 function today(){ return new Date().toISOString().slice(0,10); }
@@ -564,8 +619,12 @@ function fmtDate(str){
 }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function fmtNum(n){ return '#'+String(n).padStart(3,'0'); }
-function getNextNum(){ return parseInt(localStorage.getItem(LS.INV_NUM)||'0')+1; }
-function bumpNum(){ localStorage.setItem(LS.INV_NUM, getNextNum()); }
+
+// Invoice number = max existing + 1, derived from log
+function getNextNum(){
+  if(!_logCache || !_logCache.length) return 1;
+  return Math.max(..._logCache.map(e=>e.inv_id||0)) + 1;
+}
 function updateNumDisplay(){ document.getElementById('next-inv-display').textContent = fmtNum(getNextNum()); }
 
 function buildHrOpts(sel){
@@ -583,14 +642,27 @@ window.switchTab = function(name, btn){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   btn.classList.add('active');
-  if(name==='log') renderLog();
+  if(name==='log'){ loadLogFromDB().then(()=>renderLog()); }
 };
 
 // ── SETTINGS ─────────────────────────────────────────────────────
-function loadSettings(){
-  try{ return JSON.parse(localStorage.getItem(LS.SETTINGS)||'{}'); }catch(e){ return {}; }
+let _settingsCache = {};
+
+function loadSettings(){ return _settingsCache; }
+
+async function loadSettingsFromDB(){
+  try{
+    const rows = await sbGet('pd_invoices_settings');
+    const s = {};
+    rows.forEach(r => {
+      try{ s[r.key] = JSON.parse(r.value); }catch(e){ s[r.key] = r.value; }
+    });
+    _settingsCache = s;
+    return s;
+  }catch(e){ console.warn('Settings load failed:', e); return {}; }
 }
-function saveSettings(){
+
+async function saveSettings(){
   const s={
     name:    document.getElementById('s-name').value.trim(),
     address: document.getElementById('s-address').value.trim(),
@@ -602,11 +674,23 @@ function saveSettings(){
     vatReg:  document.getElementById('s-vat-reg').checked,
     vatNum:  document.getElementById('s-vat-num').value.trim(),
   };
-  localStorage.setItem(LS.SETTINGS,JSON.stringify(s));
-  alert('Settings saved.');
+  _settingsCache = s;
+  showToast('Saving settings…', 'info');
+  try{
+    for(const [key,val] of Object.entries(s)){
+      const existing = await sbGet('pd_invoices_settings', `key=eq.${key}`);
+      if(existing.length){
+        await sbPatch('pd_invoices_settings', existing[0].id, {value: JSON.stringify(val), updated_at: new Date().toISOString()});
+      } else {
+        await sbPost('pd_invoices_settings', {key, value: JSON.stringify(val)});
+      }
+    }
+    showToast('Settings saved ✓', 'success');
+  }catch(e){ showToast('Save failed — check connection', 'error'); console.error(e); }
 }
+
 function populateSettingsForm(){
-  const s=loadSettings();
+  const s=_settingsCache;
   if(s.name)    document.getElementById('s-name').value    = s.name;
   if(s.address) document.getElementById('s-address').value = s.address;
   if(s.rate)    document.getElementById('s-rate').value    = s.rate;
@@ -616,8 +700,7 @@ function populateSettingsForm(){
   if(s.bankAcc) document.getElementById('s-bank-acc').value  = s.bankAcc;
   if(s.vatReg)  { document.getElementById('s-vat-reg').checked=true; document.getElementById('vat-number-field').style.display='block'; }
   if(s.vatNum)  document.getElementById('s-vat-num').value = s.vatNum;
-  // Apply default rate if set
-  if(s.rate) document.getElementById('day-rate').value = s.rate;
+  if(s.rate)    document.getElementById('day-rate').value = s.rate;
 }
 document.getElementById('s-vat-reg').addEventListener('change',function(){
   document.getElementById('vat-number-field').style.display = this.checked?'block':'none';
@@ -785,7 +868,7 @@ document.getElementById('day-hours').addEventListener('input',()=>{ recalcTotals
 });
 
 // ── DRAFT ────────────────────────────────────────────────────────
-function saveDraft(){
+function getDraftData(){
   const rows=[];
   document.querySelectorAll('.entry-row').forEach(row=>{
     rows.push({
@@ -795,7 +878,7 @@ function saveDraft(){
       brk:   row.querySelector('.r-break').value,
     });
   });
-  localStorage.setItem(LS.DRAFT, JSON.stringify({
+  return {
     invDate:document.getElementById('inv-date').value,
     clientName:document.getElementById('client-name').value,
     clientAddress:document.getElementById('client-address').value,
@@ -805,35 +888,94 @@ function saveDraft(){
     stdStart:getStdStart(), stdFinish:getStdFinish(),
     stdBreak:document.getElementById('std-break').value,
     rows,
-  }));
+  };
 }
 
-function restoreDraft(){
-  try{
-    const d=JSON.parse(localStorage.getItem(LS.DRAFT)||'null');
-    if(!d){ addRow(); return; }
-    if(d.invDate)       document.getElementById('inv-date').value=d.invDate;
-    if(d.clientName)    document.getElementById('client-name').value=d.clientName;
-    if(d.clientAddress) document.getElementById('client-address').value=d.clientAddress;
-    if(d.paymentTerms)  document.getElementById('payment-terms').value=d.paymentTerms;
-    if(d.dayRate)       document.getElementById('day-rate').value=d.dayRate;
-    if(d.dayHours)      document.getElementById('day-hours').value=d.dayHours;
-    if(d.stdStart){
-      const[h,m]=d.stdStart.split(':');
-      document.getElementById('std-start-h').value=h;
-      document.getElementById('std-start-m').value=m;
-    }
-    if(d.stdFinish){
-      const[h,m]=d.stdFinish.split(':');
-      document.getElementById('std-finish-h').value=h;
-      document.getElementById('std-finish-m').value=m;
-    }
-    if(d.stdBreak) document.getElementById('std-break').value=d.stdBreak;
-    updateStdPreview();
-    if(d.rows&&d.rows.length){ d.rows.forEach(r=>addRow(r)); }
-    else { addRow(); }
-  }catch(e){ addRow(); }
+function saveDraft(){
+  // Always save to localStorage immediately (fast, works offline)
+  localStorage.setItem(LS_DRAFT, JSON.stringify(getDraftData()));
 }
+
+async function saveDraftToDB(){
+  const d = getDraftData();
+  // Also save locally
+  localStorage.setItem(LS_DRAFT, JSON.stringify(d));
+  showToast('Saving draft…','info');
+  try{
+    const existing = await sbGet('pd_invoices_settings', 'key=eq.draft');
+    if(existing.length){
+      await sbPatch('pd_invoices_settings', existing[0].id, {
+        value: JSON.stringify(d),
+        updated_at: new Date().toISOString(),
+      });
+    } else {
+      await sbPost('pd_invoices_settings', {key:'draft', value: JSON.stringify(d)});
+    }
+    showToast('Draft saved ✓ — safe on all devices','success');
+    document.getElementById('draft-status').textContent = '💾 Draft saved ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){
+    showToast('Draft saved locally (DB unavailable)','info');
+    document.getElementById('draft-status').textContent = '💾 Saved locally';
+    console.warn('Draft DB save failed:', e);
+  }
+}
+
+async function clearDraftFromDB(){
+  try{
+    const existing = await sbGet('pd_invoices_settings', 'key=eq.draft');
+    if(existing.length) await sbDelete('pd_invoices_settings', existing[0].id);
+  }catch(e){ console.warn('Could not clear draft from DB:', e); }
+  localStorage.removeItem(LS_DRAFT);
+}
+
+function applyDraftToForm(d){
+  if(!d) return false;
+  if(d.invDate)       document.getElementById('inv-date').value=d.invDate;
+  if(d.clientName)    document.getElementById('client-name').value=d.clientName;
+  if(d.clientAddress) document.getElementById('client-address').value=d.clientAddress;
+  if(d.paymentTerms)  document.getElementById('payment-terms').value=d.paymentTerms;
+  if(d.dayRate)       document.getElementById('day-rate').value=d.dayRate;
+  if(d.dayHours)      document.getElementById('day-hours').value=d.dayHours;
+  if(d.stdStart){
+    const[h,m]=d.stdStart.split(':');
+    document.getElementById('std-start-h').value=h;
+    document.getElementById('std-start-m').value=m;
+  }
+  if(d.stdFinish){
+    const[h,m]=d.stdFinish.split(':');
+    document.getElementById('std-finish-h').value=h;
+    document.getElementById('std-finish-m').value=m;
+  }
+  if(d.stdBreak) document.getElementById('std-break').value=d.stdBreak;
+  updateStdPreview();
+  if(d.rows&&d.rows.length){ d.rows.forEach(r=>addRow(r)); }
+  else { addRow(); }
+  return true;
+}
+
+async function restoreDraft(){
+  try{
+    // Try DB first (most up to date across devices)
+    const dbRows = await sbGet('pd_invoices_settings','key=eq.draft');
+    if(dbRows.length){
+      const d = JSON.parse(dbRows[0].value);
+      if(applyDraftToForm(d)){
+        showToast('Draft restored from cloud ✓','success');
+        document.getElementById('draft-status').textContent = '☁️ Draft restored';
+        return;
+      }
+    }
+  }catch(e){ console.warn('DB draft load failed, falling back to localStorage'); }
+  // Fallback to localStorage
+  try{
+    const d=JSON.parse(localStorage.getItem(LS_DRAFT)||'null');
+    if(applyDraftToForm(d)) return;
+  }catch(e){}
+  addRow();
+}
+
+// Save draft button
+document.getElementById('save-draft-btn').addEventListener('click', saveDraftToDB);
 
 // ── CLEAR ────────────────────────────────────────────────────────
 document.getElementById('clear-btn').addEventListener('click',()=>{
@@ -842,7 +984,8 @@ document.getElementById('clear-btn').addEventListener('click',()=>{
   document.getElementById('client-name').value='';
   document.getElementById('client-address').value='';
   document.getElementById('inv-date').value=today();
-  addRow(); recalcTotals(); saveDraft();
+  addRow(); recalcTotals();
+  clearDraftFromDB();
 });
 
 // ── BUILD INVOICE HTML ───────────────────────────────────────────
@@ -1055,9 +1198,7 @@ document.getElementById('modal-print-btn').addEventListener('click',()=>{
 });
 
 // ── MODAL: CONFIRM & LOG ─────────────────────────────────────────
-document.getElementById('modal-confirm-btn').addEventListener('click',()=>{
-  // Save to log
-  // Collect raw row data for later editing
+document.getElementById('modal-confirm-btn').addEventListener('click', async ()=>{
   const rawRows=[];
   document.querySelectorAll('.entry-row').forEach(row=>{
     const sh=row.querySelector('.r-start-h').value, sm=row.querySelector('.r-start-m').value;
@@ -1068,37 +1209,51 @@ document.getElementById('modal-confirm-btn').addEventListener('click',()=>{
       brk:   row.querySelector('.r-break').value,
     });
   });
-  const logEntry={
-    id:       _currentInvNum,
-    num:      fmtNum(_currentInvNum),
-    date:     document.getElementById('inv-date').value,
-    client:   _currentClientName,
-    clientAddress: document.getElementById('client-address').value,
-    amount:   _currentInvTotal,
-    terms:    document.getElementById('payment-terms').value,
-    termsText:_currentTermsText,
-    dayRate:  document.getElementById('day-rate').value,
-    dayHours: document.getElementById('day-hours').value,
-    rows:     rawRows,
-    paid:     false,
-    created:  new Date().toISOString(),
-    html:     _currentInvHTML,
+  const invNum = getNextNum();
+  const dbRow = {
+    inv_id:         invNum,
+    inv_num:        fmtNum(invNum),
+    inv_date:       document.getElementById('inv-date').value,
+    client:         _currentClientName,
+    client_address: document.getElementById('client-address').value,
+    amount:         _currentInvTotal,
+    terms:          document.getElementById('payment-terms').value,
+    terms_text:     _currentTermsText,
+    day_rate:       parseFloat(document.getElementById('day-rate').value)||0,
+    day_hours:      parseFloat(document.getElementById('day-hours').value)||8,
+    rows:           rawRows,
+    html:           _currentInvHTML,
+    paid:           false,
   };
-  const log=getLog();
-  log.unshift(logEntry);
-  localStorage.setItem(LS.LOG, JSON.stringify(log));
-
-  bumpNum(); updateNumDisplay();
-  document.getElementById('modal-overlay').classList.remove('open');
-
-  // Clear form
-  document.getElementById('entries-body').innerHTML='';
-  document.getElementById('client-name').value='';
-  document.getElementById('client-address').value='';
-  document.getElementById('inv-date').value=today();
-  addRow(); recalcTotals(); saveDraft();
-
-  alert(`Invoice ${fmtNum(_currentInvNum)} logged. Next invoice will be ${fmtNum(getNextNum())}.`);
+  showToast('Saving invoice…', 'info');
+  try{
+    const saved = await sbPost('pd_invoices_log', dbRow);
+    // Add to cache
+    if(!_logCache) _logCache = [];
+    _logCache.unshift({
+      _dbId: saved[0].id,
+      id: invNum, num: fmtNum(invNum),
+      date: dbRow.inv_date, client: dbRow.client,
+      clientAddress: dbRow.client_address,
+      amount: dbRow.amount, terms: dbRow.terms,
+      termsText: dbRow.terms_text,
+      dayRate: dbRow.day_rate, dayHours: dbRow.day_hours,
+      rows: rawRows, html: _currentInvHTML,
+      paid: false, created: new Date().toISOString(),
+    });
+    updateNumDisplay();
+    document.getElementById('modal-overlay').classList.remove('open');
+    document.getElementById('entries-body').innerHTML='';
+    document.getElementById('client-name').value='';
+    document.getElementById('client-address').value='';
+    document.getElementById('inv-date').value=today();
+    await clearDraftFromDB();
+    addRow(); recalcTotals(); saveDraft();
+    showToast(`Invoice ${fmtNum(invNum)} saved ✓`, 'success');
+  }catch(e){
+    showToast('Failed to save invoice — check connection', 'error');
+    console.error(e);
+  }
 });
 
 document.getElementById('modal-close-btn').addEventListener('click',()=>{
@@ -1110,7 +1265,37 @@ document.getElementById('modal-overlay').addEventListener('click',function(e){
 
 // ── LOG ──────────────────────────────────────────────────────────
 function getLog(){
-  try{ return JSON.parse(localStorage.getItem(LS.LOG)||'[]'); }catch(e){ return []; }
+  return _logCache || [];
+}
+async function loadLogFromDB(){
+  try{
+    showToast('Loading invoice log…', 'info');
+    const rows = await sbGet('pd_invoices_log', 'order=created_at.desc');
+    _logCache = rows.map(r => ({
+      _dbId:        r.id,
+      id:           r.inv_id,
+      num:          r.inv_num,
+      date:         r.inv_date,
+      client:       r.client,
+      clientAddress:r.client_address,
+      amount:       parseFloat(r.amount)||0,
+      terms:        r.terms,
+      termsText:    r.terms_text,
+      dayRate:      r.day_rate,
+      dayHours:     r.day_hours,
+      rows:         r.rows,
+      html:         r.html,
+      paid:         r.paid,
+      created:      r.created_at,
+    }));
+    updateNumDisplay();
+    showToast('', 'clear');
+    return _logCache;
+  }catch(e){
+    console.error('Log load failed:', e);
+    showToast('Could not load log — check connection', 'error');
+    return [];
+  }
 }
 
 function renderLog(){
@@ -1166,24 +1351,33 @@ function renderLog(){
 
   // Paid toggle events
   tbody.querySelectorAll('.paid-toggle').forEach(btn=>{
-    btn.addEventListener('click',function(){
+    btn.addEventListener('click', async function(){
       const idx=parseInt(this.dataset.idx);
       const log=getLog();
-      log[idx].paid=!log[idx].paid;
-      localStorage.setItem(LS.LOG,JSON.stringify(log));
-      renderLog();
+      const entry=log[idx];
+      const newPaid=!entry.paid;
+      entry.paid=newPaid;
+      try{
+        await sbPatch('pd_invoices_log', entry._dbId, {paid: newPaid});
+        renderLog();
+      }catch(e){ showToast('Update failed','error'); entry.paid=!newPaid; }
     });
   });
 
   // Delete events
   tbody.querySelectorAll('.btn-del-log').forEach(btn=>{
-    btn.addEventListener('click',function(){
+    btn.addEventListener('click', async function(){
       const idx=parseInt(this.dataset.idx);
       const log=getLog();
-      if(!confirm(`Delete invoice ${log[idx].num}?`)) return;
-      log.splice(idx,1);
-      localStorage.setItem(LS.LOG,JSON.stringify(log));
-      renderLog();
+      const entry=log[idx];
+      if(!confirm(`Delete invoice ${entry.num}?`)) return;
+      try{
+        await sbDelete('pd_invoices_log', entry._dbId);
+        _logCache.splice(idx,1);
+        updateNumDisplay();
+        renderLog();
+        showToast(`Invoice ${entry.num} deleted`,'success');
+      }catch(e){ showToast('Delete failed','error'); console.error(e); }
     });
   });
 
@@ -1255,9 +1449,15 @@ document.getElementById('log-modal-print-btn').addEventListener('click',()=>{
 
 // ── INIT ─────────────────────────────────────────────────────────
 document.getElementById('inv-date').value=today();
-populateSettingsForm();
-updateNumDisplay();
-restoreDraft();
+(async()=>{
+  showToast('Connecting to database…','info');
+  await Promise.all([loadSettingsFromDB(), loadLogFromDB()]);
+  populateSettingsForm();
+  updateNumDisplay();
+  await restoreDraft();
+  showToast('Ready ✓','success');
+  setTimeout(()=>showToast('','clear'),2000);
+})();
 
 })();
 
@@ -1441,10 +1641,24 @@ document.getElementById('edit-save-btn').addEventListener('click', () => {
   entry.amount        = grandTotal;
   entry.html          = buildEditInvoiceHTML();
 
-  localStorage.setItem(LS.LOG, JSON.stringify(log));
-  document.getElementById('edit-modal-overlay').classList.remove('open');
-  renderLog();
-  alert(`Invoice ${entry.num} updated.`);
+  showToast('Saving changes…','info');
+  try{
+    await sbPatch('pd_invoices_log', entry._dbId, {
+      inv_date:       entry.date,
+      client:         entry.client,
+      client_address: entry.clientAddress,
+      terms:          entry.terms,
+      terms_text:     entry.termsText,
+      day_rate:       parseFloat(entry.dayRate)||0,
+      day_hours:      parseFloat(entry.dayHours)||8,
+      rows:           entry.rows,
+      amount:         entry.amount,
+      html:           entry.html,
+    });
+    document.getElementById('edit-modal-overlay').classList.remove('open');
+    renderLog();
+    showToast(`Invoice ${entry.num} updated ✓`,'success');
+  }catch(e){ showToast('Update failed — check connection','error'); console.error(e); }
 });
 
 // Build invoice HTML from the edit modal fields (mirrors buildInvoiceHTML but reads edit fields)
