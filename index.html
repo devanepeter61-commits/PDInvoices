@@ -196,6 +196,16 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .settings-save-bar{display:flex;gap:12px;justify-content:flex-end;margin-top:20px;}
 
 /* ── PRINT ── */
+
+  .lfilters{display:flex;gap:7px;margin-bottom:12px;flex-wrap:wrap;}
+  .lfbtn{padding:5px 14px;border:1.5px solid var(--bd);border-radius:20px;background:var(--wh);font-family:var(--fn);font-size:.74rem;font-weight:600;color:var(--sl);cursor:pointer;transition:all .18s;}
+  .lfbtn.on{background:var(--nv);border-color:var(--nv);color:#fff;}
+  .lfbtn.draft-on{background:#7c3aed;border-color:#7c3aed;color:#fff;}
+  .lfbtn.sent-on{background:var(--gn);border-color:var(--gn);color:#fff;}
+  .ptog.draft-st{background:#ede9fe;border-color:#7c3aed;color:#5b21b6;}
+  .bdng{padding:9px 18px;border:1.5px solid var(--rd);background:#fff;border-radius:8px;font-family:var(--fn);font-size:.82rem;font-weight:600;color:var(--rd);cursor:pointer;transition:background .2s,color .2s;}
+  .bdng:hover{background:var(--rd);color:#fff;}
+
 @media print{
   .app-header,.workspace>*:not(#print-frame-container),.modal-overlay,.tab-bar{display:none!important;}
   #print-frame-container{display:block!important;position:fixed;inset:0;}
@@ -362,8 +372,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 <header class="app-header">
   <div class="app-header-top">
     <div class="brand">
-      <h1>Peter Devane</h1>
-      <p>Invoice Generator · 43 Audley Street, Ashton-under-Lyne, OL6 6RB</p>
+      <h1 id="hdr-name">PD Invoices</h1>
+      <p id="hdr-sub">Invoice Generator</p>
     </div>
     <div class="inv-counter">
       <span>Next Invoice</span>
@@ -493,6 +503,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
     <div class="actions">
       <button class="btn-secondary" id="clear-btn">Clear All</button>
       <button class="btn-secondary" id="save-draft-btn">💾 Save Draft</button>
+      <button class="btn-secondary" id="btn-log-draft">📋 Log as Draft</button>
       <button class="btn-primary" id="produce-btn">Produce Invoice →</button>
     </div>
   </div>
@@ -508,11 +519,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
           <div class="log-stat"><span>Paid</span><strong id="log-paid">£0.00</strong></div>
         </div>
       </div>
+      <div class="lfilters">
+        <button class="lfbtn on" data-f="all">All</button>
+        <button class="lfbtn" data-f="draft">&#9998; Drafts</button>
+        <button class="lfbtn" data-f="sent">&#10003; Sent</button>
+      </div>
       <div id="log-body">
-        <div class="log-empty">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>
-          No invoices logged yet. Confirm an invoice to add it here.
-        </div>
+        <div class="log-empty">No invoices yet.</div>
       </div>
     </div>
   </div>
@@ -522,15 +535,15 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
     <div class="panel">
       <p class="section-title" style="margin-bottom:18px;">Your Details</p>
       <div class="settings-grid">
-        <div class="settings-field"><label>Your Name</label><input type="text" id="s-name" placeholder="Peter Devane"></div>
+        <div class="settings-field"><label>Your Name</label><input type="text" id="s-name" placeholder="Your name"></div>
         <div class="settings-field"><label>Default Day Rate (£)</label><input type="number" id="s-rate" placeholder="250"></div>
-        <div class="settings-field full"><label>Your Address</label><textarea id="s-address" placeholder="43 Audley Street&#10;Ashton-under-Lyne&#10;Lancashire&#10;OL6 6RB"></textarea></div>
+        <div class="settings-field full"><label>Your Address</label><textarea id="s-address" placeholder="Street&#10;Town&#10;County&#10;Postcode"></textarea></div>
       </div>
     </div>
     <div class="panel">
       <p class="section-title" style="margin-bottom:18px;">Bank Details (shown on invoice)</p>
       <div class="settings-grid">
-        <div class="settings-field"><label>Account Name</label><input type="text" id="s-bank-name" placeholder="Peter Devane"></div>
+        <div class="settings-field"><label>Account Name</label><input type="text" id="s-bank-name" placeholder="Your name"></div>
         <div class="settings-field"><label>Bank Name</label><input type="text" id="s-bank-bank" placeholder="e.g. Barclays"></div>
         <div class="settings-field"><label>Sort Code</label><input type="text" id="s-bank-sort" placeholder="00-00-00"></div>
         <div class="settings-field"><label>Account Number</label><input type="text" id="s-bank-acc" placeholder="00000000"></div>
@@ -546,7 +559,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
         <div class="settings-field"><label>VAT Registration Number</label><input type="text" id="s-vat-num" placeholder="GB 000 000 000"></div>
       </div>
     </div>
-    <div class="settings-save-bar">
+    <div class="settings-save-bar" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+      <button class="bdng" id="btn-reset">&#9888; Reset to Factory Default</button>
       <button class="btn-primary" id="save-settings-btn">Save Settings</button>
     </div>
   </div>
@@ -1002,8 +1016,8 @@ document.getElementById('clear-btn').addEventListener('click',()=>{
 // ── BUILD INVOICE HTML ───────────────────────────────────────────
 function buildInvoiceHTML(invNum){
   const settings=loadSettings();
-  const myName    = settings.name    || 'Peter Devane';
-  const myAddress = settings.address || '43 Audley Street\nAshton-under-Lyne\nLancashire\nOL6 6RB';
+  const myName    = settings.name    || '';
+  const myAddress = settings.address || '';
   const vatReg    = settings.vatReg  || false;
   const vatNum    = settings.vatNum  || '';
   const bankName  = settings.bankName|| '';
@@ -1676,8 +1690,8 @@ document.getElementById('edit-save-btn').addEventListener('click', async () => {
 // Build invoice HTML from the edit modal fields (mirrors buildInvoiceHTML but reads edit fields)
 function buildEditInvoiceHTML() {
   const settings = loadSettings();
-  const myName    = settings.name    || 'Peter Devane';
-  const myAddress = settings.address || '43 Audley Street\nAshton-under-Lyne\nLancashire\nOL6 6RB';
+  const myName    = settings.name    || '';
+  const myAddress = settings.address || '';
   const vatReg    = settings.vatReg  || false;
   const vatNum    = settings.vatNum  || '';
   const bankName  = settings.bankName|| '';
@@ -1807,7 +1821,7 @@ async function checkFirstRun(){
 
 async function saveWelcomeSettings(){
   const s = {
-    name:    document.getElementById('w-name').value.trim() || 'Peter Devane',
+    name:    document.getElementById('w-name').value.trim() || '',
     address: document.getElementById('w-address').value.trim(),
     rate:    document.getElementById('w-rate').value || '250',
     dayHours:document.getElementById('w-hours').value || '8',
@@ -1861,6 +1875,196 @@ document.getElementById('welcome-skip-btn').addEventListener('click', ()=>{
   }
   updateStdPreview();
 })();
+
+
+
+// ═══ LOG FILTER ═══════════════════════════════════════════════════════════════
+let _logFilter = 'all';
+document.querySelectorAll('.lfbtn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.lfbtn').forEach(b => b.className = 'lfbtn');
+    _logFilter = this.dataset.f;
+    this.className = 'lfbtn ' + (_logFilter === 'draft' ? 'draft-on' : _logFilter === 'sent' ? 'sent-on' : 'on');
+    renderLog();
+  });
+});
+
+// Patch renderLog to support filter and draft status
+const _origRenderLog = renderLog;
+function renderLog() {
+  const body = document.getElementById('log-body');
+  const log = getLog();
+  const sent = log.filter(e => (e.status || 'sent') === 'sent');
+  const tot = sent.reduce((a, e) => a + e.amount, 0);
+  const paid = sent.filter(e => e.paid).reduce((a, e) => a + e.amount, 0);
+  document.getElementById('log-total').textContent = '£' + tot.toFixed(2);
+  document.getElementById('log-paid').textContent = '£' + paid.toFixed(2);
+  document.getElementById('log-outstanding').textContent = '£' + (tot - paid).toFixed(2);
+  const filtered = _logFilter === 'all' ? log : log.filter(e => (e.status || 'sent') === _logFilter);
+  if (!filtered.length) {
+    body.innerHTML = '<div class="log-empty">No ' + (_logFilter === 'all' ? '' : _logFilter + ' ') + 'invoices yet.</div>';
+    return;
+  }
+  body.innerHTML = '<table class="log-table"><thead><tr><th>Ref</th><th>Date</th><th>Client</th><th>Amount</th><th>Terms</th><th>Status</th><th>View</th><th>Edit</th><th></th></tr></thead><tbody id="log-rows"></tbody></table>';
+  const tbody = document.getElementById('log-rows');
+  filtered.forEach((entry, fi) => {
+    const i = log.indexOf(entry);
+    const isDraft = (entry.status || 'sent') === 'draft';
+    const tr = document.createElement('tr');
+    const amtCell = isDraft ? '<em style="color:var(--slate);font-style:normal;">draft</em>' : '£' + entry.amount.toFixed(2);
+    const statusBtn = isDraft
+      ? `<button class="paid-toggle draft-st" data-idx="${i}" title="Promote to sent invoice"><span class="dot"></span>Draft → Send</button>`
+      : `<button class="paid-toggle ${entry.paid ? 'paid' : 'unpaid'}" data-idx="${i}"><span class="dot"></span>${entry.paid ? 'Paid' : 'Unpaid'}</button>`;
+    tr.innerHTML = `
+      <td class="mono" style="font-weight:600;color:${isDraft ? '#7c3aed' : 'var(--amber)'}">${esc(entry.num)}</td>
+      <td>${fmtDate(entry.date)}</td>
+      <td>${esc(entry.client)}</td>
+      <td class="mono">${amtCell}</td>
+      <td style="font-size:.76rem;color:var(--text-soft)">${esc(entry.termsText || '')}</td>
+      <td>${statusBtn}</td>
+      <td>${entry.html ? `<button class="btn-view-log" data-idx="${i}">&#128424;</button>` : '<span style="color:var(--slate-light)">&#8212;</span>'}</td>
+      <td>${entry.rows ? `<button class="btn-edit-log" data-idx="${i}">&#9998;</button>` : '<span style="color:var(--slate-light)">&#8212;</span>'}</td>
+      <td><button class="btn-del-log" data-idx="${i}">&#128465;</button></td>`;
+    tbody.appendChild(tr);
+  });
+  // Status toggle
+  tbody.querySelectorAll('.paid-toggle').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      const idx = parseInt(this.dataset.idx), entry = getLog()[idx];
+      if ((entry.status || 'sent') === 'draft') {
+        if (!confirm('Convert this draft to a sent invoice?')) return;
+        const newNum = getNextNum();
+        try {
+          await sbPatch('pd_invoices_log', entry._dbId, { status: 'sent', inv_id: newNum, inv_num: fmtNum(newNum) });
+          entry.status = 'sent'; entry.id = newNum; entry.num = fmtNum(newNum);
+          bumpNum(); updateNumDisplay(); renderLog();
+          showToast('Draft promoted to Invoice ' + fmtNum(newNum) + ' ✓', 'success');
+        } catch(e) { showToast('Update failed', 'error'); }
+      } else {
+        const nv = !entry.paid; entry.paid = nv;
+        try { await sbPatch('pd_invoices_log', entry._dbId, { paid: nv }); renderLog(); }
+        catch(e) { showToast('Update failed', 'error'); entry.paid = !nv; }
+      }
+    });
+  });
+  tbody.querySelectorAll('.btn-view-log').forEach(btn => btn.addEventListener('click', function() {
+    const e = getLog()[parseInt(this.dataset.idx)];
+    document.getElementById('log-invoice-preview').innerHTML = e.html;
+    document.getElementById('log-modal-overlay').classList.add('open');
+  }));
+  tbody.querySelectorAll('.btn-edit-log').forEach(btn => btn.addEventListener('click', function() { openEditModal(parseInt(this.dataset.idx)); }));
+  tbody.querySelectorAll('.btn-del-log').forEach(btn => btn.addEventListener('click', async function() {
+    const idx = parseInt(this.dataset.idx), entry = getLog()[idx];
+    if (!confirm('Delete ' + entry.num + '?')) return;
+    try {
+      await sbDelete('pd_invoices_log', entry._dbId);
+      _logCache.splice(idx, 1); updateNumDisplay(); renderLog();
+      showToast(entry.num + ' deleted', 'success');
+    } catch(e) { showToast('Delete failed', 'error'); }
+  }));
+}
+
+// ═══ LOG AS DRAFT ═════════════════════════════════════════════════════════════
+document.getElementById('btn-log-draft').addEventListener('click', async () => {
+  if (!document.getElementById('inv-client').value.trim()) { showToast('Please enter a client name', 'error'); return; }
+  const rawRows = [];
+  document.querySelectorAll('.entry-row').forEach(r => {
+    rawRows.push({ date: r.querySelector('.r-date').value, start: r.querySelector('.r-start-h').value + ':' + r.querySelector('.r-start-m').value, finish: r.querySelector('.r-finish-h').value + ':' + r.querySelector('.r-finish-m').value, brk: r.querySelector('.r-break').value });
+  });
+  const draftRef = 'D' + String(Date.now()).slice(-5);
+  const dr = parseFloat(document.getElementById('day-rate').value) || 0;
+  const dh = parseFloat(document.getElementById('day-hours').value) || 8;
+  const hr = dh > 0 ? dr / dh : 0;
+  let tot = 0;
+  rawRows.forEach(r => { const [sh,sm] = r.start.split(':'), [fh,fm] = r.finish.split(':'); const mins = (parseInt(fh)*60+parseInt(fm)) - (parseInt(sh)*60+parseInt(sm)) - (parseInt(r.brk)||0); if (mins > 0) tot += mins/60*hr; });
+  const tv = document.getElementById('inv-terms').value;
+  const tmap = { immediate:'Payment Due Immediately', '7':'Payment Due Within 7 Days', '14':'Payment Due Within 14 Days', '30':'Payment Due Within 30 Days' };
+  const db = { inv_id: 0, inv_num: draftRef, inv_date: document.getElementById('inv-date').value, client: document.getElementById('inv-client').value.trim(), client_address: document.getElementById('inv-addr').value, amount: tot, terms: tv, terms_text: tmap[tv]||'', day_rate: dr, day_hours: dh, rows: rawRows, html: '', paid: false, status: 'draft' };
+  showToast('Logging draft…', 'info');
+  try {
+    const saved = await sbPost('pd_invoices_log', db);
+    if (!_logCache) _logCache = [];
+    _logCache.unshift({ _dbId: saved[0].id, id: 0, num: draftRef, date: db.inv_date, client: db.client, clientAddress: db.client_address, amount: tot, terms: tv, termsText: db.terms_text, dayRate: dr, dayHours: dh, rows: rawRows, html: '', paid: false, status: 'draft', created: new Date().toISOString() });
+    showToast('Draft logged ✓', 'success');
+  } catch(e) { showToast('Failed to log draft', 'error'); console.error(e); }
+});
+
+// ═══ FACTORY RESET (keeps Supabase credentials) ════════════════════════════════
+document.getElementById('btn-reset').addEventListener('click', async () => {
+  if (!confirm('Reset to factory default?\n\nThis will clear all your settings and show the welcome screen.\nYour invoice log will NOT be deleted.\nYour Supabase connection will NOT be affected.\n\nContinue?')) return;
+  showToast('Resetting…', 'info');
+  try {
+    const rows = await sbGet('pd_invoices_settings', 'key=neq.draft');
+    for (const r of rows) await sbDelete('pd_invoices_settings', r.id);
+    _settingsCache = {};
+    localStorage.removeItem('pd_inv_draft');
+    // Clear settings form
+    ['s-name','s-addr','s-rate','s-bank-name','s-bank-bank','s-bank-sort','s-bank-acc','s-vat-num'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+    const vatEl = document.getElementById('s-vat-reg'); if(vatEl) vatEl.checked = false;
+    const vatWrap = document.getElementById('vat-number-field'); if(vatWrap) vatWrap.style.display = 'none';
+    document.getElementById('day-rate').value = '250';
+    // Reset header
+    document.getElementById('hdr-name').textContent = 'PD Invoices';
+    // Show welcome
+    document.getElementById('welcome-overlay').style.display = 'flex';
+    showToast('Reset complete ✓', 'success');
+  } catch(e) { showToast('Reset failed — check connection', 'error'); console.error(e); }
+});
+
+// ═══ WELCOME STD HOURS + DYNAMIC HEADER ═══════════════════════════════════════
+(function buildWelcomeHrSels() {
+  ['w-ssh','w-sfh'].forEach((id, i) => {
+    const el = document.getElementById(id); if (!el) return;
+    el.innerHTML = '';
+    for (let h = 6; h <= 22; h++) {
+      const v = String(h).padStart(2,'0');
+      const opt = document.createElement('option'); opt.value = v; opt.textContent = v;
+      if ((i===0&&h===9)||(i===1&&h===17)) opt.selected = true;
+      el.appendChild(opt);
+    }
+  });
+})();
+
+// Patch saveWelcomeSettings to include std hours and update header
+const _origSaveWelcome = saveWelcomeSettings;
+async function saveWelcomeSettings() {
+  const stdStart = (document.getElementById('w-ssh')?.value||'09') + ':' + (document.getElementById('w-ssm')?.value||'00');
+  const stdFinish = (document.getElementById('w-sfh')?.value||'17') + ':' + (document.getElementById('w-sfm')?.value||'00');
+  const stdBreak = document.getElementById('w-sbrk')?.value || '30';
+  const name = document.getElementById('w-name').value.trim();
+
+  // Call original save
+  await _origSaveWelcome();
+
+  // Save extra fields
+  const extras = { stdStart, stdFinish, stdBreak };
+  try {
+    for (const [k,v] of Object.entries(extras)) {
+      const ex = await sbGet('pd_invoices_settings', `key=eq.${k}`);
+      if (ex.length) await sbPatch('pd_invoices_settings', ex[0].id, { value: JSON.stringify(v), updated_at: new Date().toISOString() });
+      else await sbPost('pd_invoices_settings', { key: k, value: JSON.stringify(v) });
+    }
+    // Apply std hours to main form
+    if (stdStart) { const [h,m] = stdStart.split(':'); const sh = document.getElementById('std-start-h'); const sm2 = document.getElementById('std-start-m'); if(sh)sh.value=h; if(sm2)sm2.value=m; }
+    if (stdFinish) { const [h,m] = stdFinish.split(':'); const fh = document.getElementById('std-finish-h'); const fm = document.getElementById('std-finish-m'); if(fh)fh.value=h; if(fm)fm.value=m; }
+    if (stdBreak) { const sb = document.getElementById('std-break'); if(sb) sb.value=stdBreak; }
+    if (name) document.getElementById('hdr-name').textContent = name;
+  } catch(e) { console.warn('Extra welcome fields save failed:', e); }
+}
+
+// Update header name when settings are loaded
+const _origLoadSettings = loadSettings;
+async function loadSettings() {
+  await _origLoadSettings();
+  const s = loadSettings._cfg || _settingsCache;
+  if (s && s.name) document.getElementById('hdr-name').textContent = s.name;
+  // Apply std hours from settings
+  if (s && s.stdStart) { const [h,m] = s.stdStart.split(':'); const sh=document.getElementById('std-start-h'),sm2=document.getElementById('std-start-m'); if(sh)sh.value=h; if(sm2)sm2.value=m; }
+  if (s && s.stdFinish) { const [h,m] = s.stdFinish.split(':'); const fh=document.getElementById('std-finish-h'),fm=document.getElementById('std-finish-m'); if(fh)fh.value=h; if(fm)fm.value=m; }
+  if (s && s.stdBreak) { const sb=document.getElementById('std-break'); if(sb)sb.value=s.stdBreak; }
+  if (s && s.rate) document.getElementById('day-rate').value = s.rate;
+  if (s && s.dayHours) document.getElementById('day-hours').value = s.dayHours;
+}
 
 </script>
 
@@ -1938,68 +2142,61 @@ document.getElementById('welcome-skip-btn').addEventListener('click', ()=>{
 
 <!-- ── WELCOME MODAL ── -->
 <div class="modal-overlay" id="welcome-overlay" style="display:none;z-index:2000;">
-  <div class="modal" style="max-width:560px;">
-    <div style="padding:32px 32px 0;">
-      <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
-        <div style="background:linear-gradient(135deg,var(--navy),var(--navy-light));border-radius:12px;padding:12px;flex-shrink:0;">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>
+  <div class="modal" style="max-width:580px;">
+    <div style="padding:26px 26px 0;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+        <div style="background:linear-gradient(135deg,var(--nv,#1a2540),var(--nv3,#2e3d63));border-radius:10px;padding:10px;flex-shrink:0;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>
         </div>
         <div>
-          <h2 style="font-size:1.25rem;font-weight:700;color:var(--navy);">Welcome to PD Invoice Generator</h2>
-          <p style="font-size:.82rem;color:var(--slate);margin-top:3px;">Let's set up your details before you start.</p>
+          <h2 style="font-size:1.1rem;font-weight:700;color:var(--navy,#1a2540);">Welcome to PD Invoices</h2>
+          <p style="font-size:.78rem;color:var(--slate,#6b7a99);margin-top:2px;">Set up your details to get started. You can update these anytime in Settings.</p>
         </div>
       </div>
-
-      <div style="background:var(--bg);border-radius:10px;padding:18px;margin-bottom:18px;border:1px solid var(--border);">
-        <p style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--slate);margin-bottom:14px;padding-left:8px;border-left:3px solid var(--amber);padding-left:10px;">Your Details</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-          <div class="meta-field" style="grid-column:1/-1;">
-            <label>Your Name</label>
-            <input type="text" id="w-name" placeholder="Peter Devane" value="Peter Devane">
+      <div style="background:var(--bg,#f4f6fb);border-radius:10px;padding:14px;margin-bottom:12px;border:1px solid var(--border,#dde3f0);">
+        <p style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--slate,#6b7a99);margin-bottom:10px;padding-left:10px;border-left:3px solid #f0a500;">Your Details</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="meta-field" style="grid-column:1/-1;"><label>Your Name</label><input type="text" id="w-name" placeholder="e.g. John Smith"></div>
+          <div class="meta-field" style="grid-column:1/-1;"><label>Your Address</label><textarea id="w-address" style="min-height:66px;" placeholder="Street&#10;Town&#10;County&#10;Postcode"></textarea></div>
+          <div class="meta-field"><label>Default Day Rate (£)</label><input type="number" id="w-rate" placeholder="e.g. 250"></div>
+          <div class="meta-field"><label>Working Day (hrs)</label><input type="number" id="w-hours" value="8"></div>
+        </div>
+      </div>
+      <div style="background:var(--bg,#f4f6fb);border-radius:10px;padding:14px;margin-bottom:12px;border:1px solid var(--border,#dde3f0);">
+        <p style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--slate,#6b7a99);margin-bottom:10px;padding-left:10px;border-left:3px solid #f0a500;">Standard Working Hours</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;" id="w-hrs-grid">
+          <div class="meta-field"><label>Start</label>
+            <div style="display:flex;gap:3px;align-items:center;">
+              <select id="w-ssh" style="flex:1;border:1.5px solid #dde3f0;border-radius:6px;padding:6px 4px;font-family:monospace;font-size:.83rem;outline:none;background:#f4f6fb;"></select>
+              <span style="font-weight:700;color:#6b7a99;font-size:.82rem;">:</span>
+              <select id="w-ssm" style="width:50px;border:1.5px solid #dde3f0;border-radius:6px;padding:6px 2px;font-family:monospace;font-size:.83rem;outline:none;background:#f4f6fb;text-align:center;"><option value="00" selected>00</option><option value="15">15</option><option value="30">30</option><option value="45">45</option></select>
+            </div>
           </div>
-          <div class="meta-field" style="grid-column:1/-1;">
-            <label>Your Address</label>
-            <textarea id="w-address" style="min-height:72px;">43 Audley Street
-Ashton-under-Lyne
-Lancashire
-OL6 6RB</textarea>
+          <div class="meta-field"><label>Finish</label>
+            <div style="display:flex;gap:3px;align-items:center;">
+              <select id="w-sfh" style="flex:1;border:1.5px solid #dde3f0;border-radius:6px;padding:6px 4px;font-family:monospace;font-size:.83rem;outline:none;background:#f4f6fb;"></select>
+              <span style="font-weight:700;color:#6b7a99;font-size:.82rem;">:</span>
+              <select id="w-sfm" style="width:50px;border:1.5px solid #dde3f0;border-radius:6px;padding:6px 2px;font-family:monospace;font-size:.83rem;outline:none;background:#f4f6fb;text-align:center;"><option value="00" selected>00</option><option value="15">15</option><option value="30">30</option><option value="45">45</option></select>
+            </div>
           </div>
-          <div class="meta-field">
-            <label>Default Day Rate (£)</label>
-            <input type="number" id="w-rate" placeholder="250" value="250">
-          </div>
-          <div class="meta-field">
-            <label>Working Day (hrs)</label>
-            <input type="number" id="w-hours" placeholder="8" value="8">
+          <div class="meta-field"><label>Break (min)</label>
+            <select id="w-sbrk" style="width:100%;border:1.5px solid #dde3f0;border-radius:6px;padding:6px 7px;font-family:monospace;font-size:.83rem;outline:none;background:#f4f6fb;"><option value="0">00</option><option value="15">15</option><option value="30" selected>30</option><option value="45">45</option><option value="60">60</option></select>
           </div>
         </div>
       </div>
-
-      <div style="background:var(--bg);border-radius:10px;padding:18px;margin-bottom:24px;border:1px solid var(--border);">
-        <p style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--slate);margin-bottom:14px;padding-left:10px;border-left:3px solid var(--amber);">Bank Details <span style="font-weight:400;font-size:.7rem;text-transform:none;letter-spacing:0;">(shown on invoice)</span></p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-          <div class="meta-field">
-            <label>Account Name</label>
-            <input type="text" id="w-bank-name" placeholder="Peter Devane">
-          </div>
-          <div class="meta-field">
-            <label>Bank Name</label>
-            <input type="text" id="w-bank-bank" placeholder="e.g. Barclays">
-          </div>
-          <div class="meta-field">
-            <label>Sort Code</label>
-            <input type="text" id="w-bank-sort" placeholder="00-00-00">
-          </div>
-          <div class="meta-field">
-            <label>Account Number</label>
-            <input type="text" id="w-bank-acc" placeholder="00000000">
-          </div>
+      <div style="background:var(--bg,#f4f6fb);border-radius:10px;padding:14px;margin-bottom:20px;border:1px solid var(--border,#dde3f0);">
+        <p style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--slate,#6b7a99);margin-bottom:10px;padding-left:10px;border-left:3px solid #f0a500;">Bank Details <span style="font-weight:400;font-size:.66rem;text-transform:none;letter-spacing:0;">(shown on invoice)</span></p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="meta-field"><label>Account Name</label><input type="text" id="w-bank-name" placeholder="Your name"></div>
+          <div class="meta-field"><label>Bank Name</label><input type="text" id="w-bank-bank" placeholder="e.g. Barclays"></div>
+          <div class="meta-field"><label>Sort Code</label><input type="text" id="w-bank-sort" placeholder="00-00-00"></div>
+          <div class="meta-field"><label>Account Number</label><input type="text" id="w-bank-acc" placeholder="00000000"></div>
         </div>
       </div>
     </div>
     <div class="modal-actions" style="justify-content:space-between;">
       <button class="btn-secondary" id="welcome-skip-btn">Skip for now</button>
-      <button class="btn-primary" id="welcome-save-btn">Save & Get Started →</button>
+      <button class="btn-primary" id="welcome-save-btn">Save &amp; Get Started →</button>
     </div>
   </div>
 </div>
