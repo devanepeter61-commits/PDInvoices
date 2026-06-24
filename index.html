@@ -276,7 +276,6 @@ body{font-family:var(--fn);background:var(--bg);color:var(--tx);min-height:100vh
   <div class="acts">
     <button class="bsec" id="btn-clear">Clear All</button>
     <button class="bsec" id="btn-save-draft">&#128190; Save Draft</button>
-    <button class="bsec" id="btn-log-draft">&#128203; Log as Draft</button>
     <button class="bpri" id="btn-produce">Produce Invoice &rarr;</button>
   </div>
 </div>
@@ -633,24 +632,6 @@ document.getElementById('btn-save-draft').addEventListener('click',async()=>{
   }catch(e){toast('Saved locally (offline)','inf');}
 });
 
-document.getElementById('btn-log-draft').addEventListener('click',async()=>{
-  const client=document.getElementById('inv-client').value.trim();
-  if(!client){toast('Please enter a client name','err');return;}
-  const rows=getRawRows();
-  const ref='D'+String(Date.now()).slice(-5);
-  const dr=parseFloat(document.getElementById('s-rate').value)||0;
-  const dh=parseFloat(document.getElementById('s-dayhrs').value)||8;
-  const hr=dh>0?dr/dh:0;
-  let tot=0;rows.forEach(r=>{const[sh,sm]=r.start.split(':'),[fh,fm]=r.finish.split(':');const m=(parseInt(fh)*60+parseInt(fm))-(parseInt(sh)*60+parseInt(sm))-(parseInt(r.brk)||0);if(m>0)tot+=m/60*hr;});
-  const tv=document.getElementById('inv-terms').value;
-  const db={inv_id:0,inv_num:ref,inv_date:document.getElementById('inv-date').value,client,client_address:document.getElementById('inv-addr').value,amount:tot,terms:tv,terms_text:TMAP[tv]||'',day_rate:dr,day_hours:dh,rows,html:'',paid:false,status:'draft'};
-  toast('Logging draft...','inf');
-  try{
-    const saved=await sbPost('pd_invoices_log',db);
-    _log.unshift({_dbId:saved[0].id,id:0,num:ref,date:db.inv_date,client,clientAddress:db.client_address,amount:tot,terms:tv,termsText:db.terms_text,dayRate:dr,dayHours:dh,rows,html:'',paid:false,status:'draft',created:new Date().toISOString()});
-    toast('Draft logged','ok');
-  }catch(e){toast('Failed: '+e.message,'err');console.error(e);}
-});
 
 async function clearDraft(){
   localStorage.removeItem('pd_draft');
